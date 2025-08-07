@@ -1,10 +1,11 @@
 import React from 'react';
-import { Link, NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger, SheetContent } from '@/components/ui/sheet';
-import { Menu } from 'lucide-react';
+import { Menu, Search, X, Users, Briefcase, Building, MapPin, Filter } from 'lucide-react';
 import { useMobile } from '@/contexts/MobileContext';
-import { X } from 'lucide-react';
+
+import GlobalSearch from '@/components/common/GlobalSearch';
 
 const navLinks = [
   { to: '/', label: 'Home', color: 'blue' },
@@ -21,7 +22,9 @@ const navFont = 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif';
 const WelcomeHeader = () => {
   const { isMobile } = useMobile();
   const location = useLocation();
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [searchOpen, setSearchOpen] = React.useState(false);
 
   // Debug logging
   React.useEffect(() => {
@@ -51,6 +54,8 @@ const WelcomeHeader = () => {
     
     return () => clearTimeout(timeoutId);
   }, [location.pathname]);
+
+
 
   return (
     <header
@@ -192,7 +197,12 @@ const WelcomeHeader = () => {
        <div className="absolute inset-0 bg-gradient-to-r from-blue-50/40 via-transparent to-cyan-50/40" />
        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-white/50 to-transparent" />
        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(37,99,235,0.03),transparent_50%)]" />
-             <div className="w-full flex flex-row items-center justify-between gap-2 md:gap-4 relative z-30">
+             {/* Global Search Overlay */}
+      <GlobalSearch 
+        isOpen={searchOpen}
+        onClose={() => setSearchOpen(false)}
+      />
+      <div className="w-full flex flex-row items-center justify-between gap-2 md:gap-4 relative z-30">
                  {/* Professional Logo and Title */}
          <div className="flex flex-row items-center gap-2 md:gap-4 lg:gap-6 min-w-0 flex-1 md:flex-none md:justify-start">
            <div className="logo-container flex items-center justify-center rounded-xl border-2 border-blue-200/60 shadow-2xl flex-shrink-0" style={{padding:'8px 12px',minWidth:'fit-content'}}>
@@ -210,8 +220,8 @@ const WelcomeHeader = () => {
              <div className="absolute inset-0 bg-gradient-to-br from-white/25 to-transparent rounded-xl" />
            </div>
                      <div className="flex flex-col leading-tight ml-1 md:ml-2 min-w-0 flex-1">
-             <span className="brand-text font-extrabold text-lg md:text-xl lg:text-2xl xl:text-3xl tracking-tight truncate" style={{fontFamily:logoFont,letterSpacing:'-0.8px',lineHeight:'1.05',textTransform:'uppercase'}}>UNITY</span>
-             <span className="text-gray-600 text-[10px] md:text-xs lg:text-sm font-medium tracking-wide leading-tight truncate" style={{fontFamily:navFont,marginTop:'-2px'}}>(not for profit and non political organisation)</span>
+             <span className="brand-text font-extrabold text-lg md:text-xl lg:text-2xl xl:text-3xl tracking-tight truncate" style={{fontFamily:logoFont,letterSpacing:'-0.8px',lineHeight:'1.05',textTransform:'uppercase'}}>UNITY Nest</span>
+             <span className="text-gray-600 text-[10px] md:text-xs lg:text-sm font-medium tracking-wide leading-tight truncate" style={{fontFamily:navFont,marginTop:'-2px'}}>(non profit organization)</span>
            </div>
         </div>
         {/* Desktop Nav & Auth */}
@@ -237,6 +247,15 @@ const WelcomeHeader = () => {
             </ul>
           </nav>
           <div className="flex gap-4 md:gap-5 min-w-fit justify-center md:justify-end">
+            {/* Global Search Button - Desktop */}
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-300"
+              title="Global Search"
+            >
+              <Search className="w-5 h-5" />
+            </button>
+            
             <Link to="/login">
               <Button
                 className="professional-button bg-white/95 backdrop-blur-sm border-2 border-blue-200/70 text-blue-800 font-semibold px-6 md:px-8 py-3 rounded-xl shadow-xl hover:bg-blue-50/95 hover:text-blue-900 hover:border-blue-300 hover:scale-105 hover:shadow-2xl transition-all duration-300 text-sm md:text-base"
@@ -257,9 +276,18 @@ const WelcomeHeader = () => {
         </div>
         
                  {/* Mobile Hamburger - CSS-based fallback */}
-         <div className="md:hidden flex-shrink-0">
-           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-             <SheetTrigger asChild>
+         <div className="md:hidden flex-shrink-0 flex items-center gap-2">
+           {/* Global Search Button - Mobile */}
+           <button
+             onClick={() => setSearchOpen(true)}
+             className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-300"
+             title="Global Search"
+           >
+             <Search className="w-5 h-5" />
+           </button>
+
+          <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+            <SheetTrigger asChild>
                                <Button 
                   variant="ghost" 
                   size="icon" 

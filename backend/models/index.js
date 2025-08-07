@@ -77,7 +77,7 @@ if (db.Job && db.JobApplication) {
 // User 1:N JobApplication
 if (db.User && db.JobApplication) {
   db.User.hasMany(db.JobApplication, { foreignKey: 'user_id', as: 'jobApplications', onDelete: 'CASCADE' });
-  db.JobApplication.belongsTo(db.User, { foreignKey: 'user_id', as: 'user' });
+  db.JobApplication.belongsTo(db.User, { foreignKey: 'user_id', as: 'applicant' });
 }
 // User 1:N Payment
 if (db.User && db.Payment) {
@@ -93,6 +93,11 @@ if (db.User && db.BulkUploadLog) {
 if (db.User && db.AdminLog) {
   db.User.hasMany(db.AdminLog, { foreignKey: 'admin_id', as: 'adminLogs' });
   db.AdminLog.belongsTo(db.User, { foreignKey: 'admin_id', as: 'admin' });
+}
+// User 1:N Notification
+if (db.User && db.Notification) {
+  db.User.hasMany(db.Notification, { foreignKey: 'user_id', as: 'notifications', onDelete: 'CASCADE' });
+  db.Notification.belongsTo(db.User, { foreignKey: 'user_id', as: 'user' });
 }
 
 db.sequelize = sequelize;

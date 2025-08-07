@@ -35,6 +35,48 @@ exports.getUserById = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// New function for network member profiles - allows authenticated members to view other members
+exports.getNetworkMemberProfile = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    // Ensure the requested user is a member (not admin/moderator)
+    const user = await User.findByPk(id, { 
+      attributes: { exclude: ['password_hash'] },
+      include: [
+        {
+          model: Profile,
+          as: 'profile',
+          attributes: ['photo_url', 'village', 'mandal', 'district', 'native_place', 'caste', 'subcaste', 'marital_status', 'dob', 'gender']
+        },
+        {
+          model: EducationDetail,
+          as: 'educationDetails',
+          attributes: ['degree', 'institution', 'year_of_passing', 'grade'],
+          order: [['id', 'DESC']]
+        },
+        {
+          model: EmploymentDetail,
+          as: 'employmentDetails',
+          attributes: ['role', 'company_name', 'years_of_experience', 'currently_working'],
+          order: [['id', 'DESC']]
+        }
+      ]
+    });
+    
+    if (!user) {
+      throw new NotFoundError('Member not found');
+    }
+    
+    // Only allow viewing member profiles (not admin/moderator profiles)
+    if (user.role !== 'member') {
+      return res.status(403).json({ error: 'Can only view member profiles' });
+    }
+    
+    res.json(user);
+  } catch (err) { next(err); }
+};
+
 exports.updateUserById = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -60,13 +102,40 @@ exports.updateUserById = async (req, res, next) => {
 
 exports.getAllMembers = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, search, sortBy = 'recent' } = req.query;
+    const { 
+      page = 1, 
+      limit = 20, 
+      search, 
+      sortBy = 'recent',
+      district,
+      caste,
+      experience,
+      education,
+      company
+    } = req.query;
     const offset = (page - 1) * limit;
     
     // Validate and sanitize inputs
     const pageNum = Math.max(1, parseInt(page) || 1);
     const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
     const searchTerm = search ? search.trim() : '';
+    
+    // Check if any search criteria is provided
+    const hasSearchCriteria = searchTerm || district || caste;
+    
+    if (!hasSearchCriteria) {
+      // Return empty results if no search criteria provided
+      return res.json({
+        members: [],
+        pagination: {
+          page: pageNum,
+          total: 0,
+          limit: limitNum,
+          pages: 0
+        },
+        message: 'Please provide a search term or select filters to find members'
+      });
+    }
     
     // Build where clause for search - exclude current user
     const where = { 
@@ -77,8 +146,23 @@ exports.getAllMembers = async (req, res, next) => {
     if (searchTerm) {
       where[Op.or] = [
         { full_name: { [Op.like]: `%${searchTerm}%` } },
-        { email: { [Op.like]: `%${searchTerm}%` } }
+        { email: { [Op.like]: `%${searchTerm}%` } },
+        { '$profile.village$': { [Op.like]: `%${searchTerm}%` } },
+        { '$profile.mandal$': { [Op.like]: `%${searchTerm}%` } },
+        { '$profile.district$': { [Op.like]: `%${searchTerm}%` } },
+        { '$profile.native_place$': { [Op.like]: `%${searchTerm}%` } },
+        { '$profile.caste$': { [Op.like]: `%${searchTerm}%` } },
+        { '$profile.subcaste$': { [Op.like]: `%${searchTerm}%` } }
       ];
+    }
+
+    // Add additional filters (only profile-based filters for now)
+    if (district) {
+      where['$profile.district$'] = { [Op.like]: `%${district}%` };
+    }
+    
+    if (caste) {
+      where['$profile.caste$'] = { [Op.like]: `%${caste}%` };
     }
 
     // Build order clause
@@ -94,7 +178,8 @@ exports.getAllMembers = async (req, res, next) => {
         order = [['created_at', 'DESC']];
     }
 
-    const { count, rows: users } = await User.findAndCountAll({
+    // Use findAndCountAll for all queries since we're only searching in profile table
+    const result = await User.findAndCountAll({
       where,
       attributes: { exclude: ['password_hash'] },
       include: [
@@ -125,6 +210,9 @@ exports.getAllMembers = async (req, res, next) => {
       offset: (pageNum - 1) * limitNum,
       order
     });
+    
+    const count = result.count;
+    const users = result.rows;
 
     // Transform data for frontend
     const members = users.map(user => ({
@@ -164,5 +252,60 @@ exports.getAllMembers = async (req, res, next) => {
   } catch (err) { 
     console.error('Error in getAllMembers:', err);
     next(err); 
+  }
+};
+
+// Get filter options for network search
+exports.getNetworkFilterOptions = async (req, res, next) => {
+  try {
+    // Get unique districts
+    const districts = await Profile.findAll({
+      attributes: ['district'],
+      where: {
+        district: { [Op.ne]: null }
+      },
+      group: ['district'],
+      order: [['district', 'ASC']]
+    });
+
+    // Get unique castes
+    const castes = await Profile.findAll({
+      attributes: ['caste'],
+      where: {
+        caste: { [Op.ne]: null }
+      },
+      group: ['caste'],
+      order: [['caste', 'ASC']]
+    });
+
+    // Get unique education degrees
+    const educationDegrees = await EducationDetail.findAll({
+      attributes: ['degree'],
+      where: {
+        degree: { [Op.ne]: null }
+      },
+      group: ['degree'],
+      order: [['degree', 'ASC']]
+    });
+
+    // Get unique companies
+    const companies = await EmploymentDetail.findAll({
+      attributes: ['company_name'],
+      where: {
+        company_name: { [Op.ne]: null }
+      },
+      group: ['company_name'],
+      order: [['company_name', 'ASC']]
+    });
+
+    res.json({
+      districts: districts.map(d => d.district).filter(Boolean),
+      castes: castes.map(c => c.caste).filter(Boolean),
+      educationDegrees: educationDegrees.map(e => e.degree).filter(Boolean),
+      companies: companies.map(c => c.company_name).filter(Boolean)
+    });
+  } catch (err) {
+    console.error('Error in getNetworkFilterOptions:', err);
+    next(err);
   }
 }; 

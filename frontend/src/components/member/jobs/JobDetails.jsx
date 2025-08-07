@@ -17,15 +17,19 @@ import {
   Share2,
   Send
 } from 'lucide-react';
-import { apiGet } from '../../../services/apiService';
+import { apiGet, apiPost } from '../../../services/apiService';
 import { useAuth } from '../../../contexts/AuthContext';
+import useCustomAlert from '../../../hooks/useCustomAlert';
 
 const JobDetails = () => {
   const { id } = useParams();
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [applying, setApplying] = useState(false);
+  const [hasApplied, setHasApplied] = useState(false);
   const { user } = useAuth();
+  const { showAlert } = useCustomAlert();
 
   useEffect(() => {
     const fetchJob = async () => {
@@ -33,6 +37,7 @@ const JobDetails = () => {
       try {
         const res = await apiGet(`/jobs/${id}`);
         setJob(res.data);
+        setHasApplied(res.data.hasApplied || false);
         setError(null);
       } catch (err) {
         setError('Failed to fetch job details');
@@ -42,6 +47,34 @@ const JobDetails = () => {
     };
     fetchJob();
   }, [id]);
+
+  const handleApply = async () => {
+    if (!user) {
+      showAlert('Please login to apply for this job', 'error');
+      return;
+    }
+
+    if (job.posted_by === user.id) {
+      showAlert('You cannot apply to your own job posting', 'error');
+      return;
+    }
+
+    setApplying(true);
+    try {
+      await apiPost(`/jobs/apply/${id}`);
+      setHasApplied(true);
+      showAlert('Application submitted successfully!', 'success');
+    } catch (err) {
+      if (err.response?.data?.error === 'Already applied') {
+        setHasApplied(true);
+        showAlert('You have already applied to this job', 'info');
+      } else {
+        showAlert('Failed to submit application. Please try again.', 'error');
+      }
+    } finally {
+      setApplying(false);
+    }
+  };
 
   if (loading) return <div className="max-w-6xl mx-auto px-4 py-8">Loading...</div>;
   if (error) return <div className="max-w-6xl mx-auto px-4 py-8 text-red-600">{error}</div>;
@@ -175,11 +208,35 @@ const JobDetails = () => {
                 {statusMessage && (
                   <div className={`mb-2 text-xs font-semibold ${job.status === 'rejected' ? 'text-red-600' : job.status === 'pending' ? 'text-yellow-600' : 'text-green-600'}`}>{statusMessage}</div>
                 )}
-                {/* Only show Apply button if job is accepted or poster is viewing */}
-                {canApply && job.status === 'accepted' && (
-                  <button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 flex items-center justify-center">
-                    <Send className="w-5 h-5 mr-2" />
-                    Apply Now
+                {/* Only show Apply button if job is accepted and user is not the poster */}
+                {canApply && job.status === 'accepted' && job.posted_by !== user?.id && (
+                  <button 
+                    onClick={handleApply}
+                    disabled={applying || hasApplied}
+                    className={`w-full py-3 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center ${
+                      hasApplied 
+                        ? 'bg-green-600 text-white cursor-not-allowed'
+                        : applying
+                        ? 'bg-gray-400 text-white cursor-not-allowed'
+                        : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700'
+                    }`}
+                  >
+                    {hasApplied ? (
+                      <>
+                        <CheckCircle className="w-5 h-5 mr-2" />
+                        Applied
+                      </>
+                    ) : applying ? (
+                      <>
+                        <div className="w-5 h-5 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Applying...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-5 h-5 mr-2" />
+                        Apply Now
+                      </>
+                    )}
                   </button>
                 )}
                 {/* If poster is viewing their own job and it's not accepted, hide Apply button */}

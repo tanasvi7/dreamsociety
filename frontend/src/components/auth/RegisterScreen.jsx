@@ -115,6 +115,18 @@ const RegisterScreen = () => {
         // Check if registration was successful
         if (result && result.success) {
           console.log('Registration successful, navigating to OTP verification...');
+          
+          // Preserve any redirect context for after OTP verification
+          const searchContext = localStorage.getItem('searchRedirectContext');
+          const previewContext = localStorage.getItem('previewRedirectContext');
+          
+          if (searchContext) {
+            localStorage.setItem('pendingSearchContext', searchContext);
+          }
+          if (previewContext) {
+            localStorage.setItem('pendingPreviewContext', previewContext);
+          }
+          
           navigate('/verify-otp');
         } else {
           console.log('Registration failed:', result.error);

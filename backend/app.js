@@ -14,6 +14,7 @@ const adminEmploymentRouter = require('./routes/adminEmployment');
 const adminFamilyRouter = require('./routes/adminFamily');
 const adminDashboardRouter = require('./routes/adminDashboard');
 const memberDashboardRouter = require('./routes/memberDashboard');
+const notificationsRouter = require('./routes/notifications');
 
 const app = express();
 
@@ -46,6 +47,8 @@ app.use('/jobs', require('./routes/jobs'));
 app.use('/skills', require('./routes/skills'));
 // Payments routes
 app.use('/payments', require('./routes/payments'));
+// Search routes
+app.use('/search', require('./routes/search'));
 // Admin routes
 app.use('/admin', require('./routes/adminLogs'));
 app.use('/admin', require('./routes/bulkUpload'));
@@ -58,6 +61,7 @@ app.use('/admin/profiles', adminProfilesRouter);
 app.use('/admin/education', adminEducationRouter);
 app.use('/admin/employment', adminEmploymentRouter);
 app.use('/admin/family', adminFamilyRouter);
+app.use('/notifications', notificationsRouter);
 
 // Swagger UI
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

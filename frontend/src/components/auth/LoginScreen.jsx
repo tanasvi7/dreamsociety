@@ -150,14 +150,67 @@ const LoginScreen = () => {
         
         if (result.success) {
           setLoginStep('success');
-          console.log('LoginScreen: Login successful, navigating to:', result.user?.role === 'admin' ? '/admin/dashboard' : '/dashboard');
+          console.log('LoginScreen: Login successful, checking for redirect context...');
+          
+          // Check for search or preview redirect context
+          const searchContext = localStorage.getItem('searchRedirectContext');
+          const previewContext = localStorage.getItem('previewRedirectContext');
+          
+          let redirectPath = result.user?.role === 'admin' ? '/admin/dashboard' : '/dashboard';
+          let shouldClearContext = false;
+          
+          if (searchContext) {
+            try {
+              const context = JSON.parse(searchContext);
+              const contextAge = Date.now() - context.timestamp;
+              
+              // Only use context if it's less than 5 minutes old
+              if (contextAge < 5 * 60 * 1000) {
+                console.log('LoginScreen: Found search context, will redirect to search results');
+                redirectPath = '/dashboard';
+                shouldClearContext = true;
+                // Store the context in a different key for the dashboard to use
+                localStorage.setItem('pendingSearchContext', searchContext);
+              } else {
+                console.log('LoginScreen: Search context expired, clearing');
+                localStorage.removeItem('searchRedirectContext');
+              }
+            } catch (error) {
+              console.error('LoginScreen: Error parsing search context:', error);
+              localStorage.removeItem('searchRedirectContext');
+            }
+          } else if (previewContext) {
+            try {
+              const context = JSON.parse(previewContext);
+              const contextAge = Date.now() - context.timestamp;
+              
+              // Only use context if it's less than 5 minutes old
+              if (contextAge < 5 * 60 * 1000) {
+                console.log('LoginScreen: Found preview context, will redirect to appropriate section');
+                redirectPath = '/dashboard';
+                shouldClearContext = true;
+                // Store the context in a different key for the dashboard to use
+                localStorage.setItem('pendingPreviewContext', previewContext);
+              } else {
+                console.log('LoginScreen: Preview context expired, clearing');
+                localStorage.removeItem('previewRedirectContext');
+              }
+            } catch (error) {
+              console.error('LoginScreen: Error parsing preview context:', error);
+              localStorage.removeItem('previewRedirectContext');
+            }
+          }
+          
+          console.log('LoginScreen: Final redirect path:', redirectPath);
           
           // Show success state briefly before navigation
           setTimeout(() => {
-            if (result.user?.role === 'admin') {
-              navigate('/admin/dashboard');
-            } else {
-              navigate('/dashboard');
+            navigate(redirectPath);
+            
+            // Clear the original context after navigation
+            if (shouldClearContext) {
+              localStorage.removeItem('searchRedirectContext');
+              localStorage.removeItem('previewRedirectContext');
             }
           }, 800);
         } else {

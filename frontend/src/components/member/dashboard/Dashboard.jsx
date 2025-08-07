@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useProfilePhoto } from '../../../hooks/useProfilePhoto';
 import ProfileImage from '../../common/ProfileImage';
+import { getNavigationPath, getRedirectMessage } from '../../../utils/redirectUtils';
 import { 
   User, 
   Briefcase, 
@@ -23,6 +24,7 @@ import {
   X
 } from 'lucide-react';
 import { memberDashboardService } from '../../../services/memberDashboardService';
+import { notificationService } from '../../../services/notificationService';
 import {
   ApplicationTrend,
   SuccessRate,
@@ -34,11 +36,13 @@ import {
 const Dashboard = () => {
   const { user, loadProfilePhoto } = useAuth();
   const { photoUrl, loading: photoLoading } = useProfilePhoto();
+  const navigate = useNavigate();
   const [stats, setStats] = useState([]);
   const [profileComplete, setProfileComplete] = useState(0);
   const [recentActivities, setRecentActivities] = useState([]);
   const [recommendedJobs, setRecommendedJobs] = useState([]);
   const [analytics, setAnalytics] = useState(null);
+  const [recentNotifications, setRecentNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
@@ -54,13 +58,15 @@ const Dashboard = () => {
         profileResponse,
         activitiesResponse,
         jobsResponse,
-        analyticsResponse
+        analyticsResponse,
+        notificationsResponse
       ] = await Promise.all([
         memberDashboardService.getMemberDashboardStats(),
         memberDashboardService.getProfileCompletion(),
         memberDashboardService.getRecentActivities(5),
         memberDashboardService.getRecommendedJobs(4),
-        memberDashboardService.getMemberAnalytics()
+        memberDashboardService.getMemberAnalytics(),
+        notificationService.getUserNotifications(1, 3)
       ]);
 
       setStats(statsResponse.stats);
@@ -68,6 +74,7 @@ const Dashboard = () => {
       setRecentActivities(activitiesResponse.activities);
       setRecommendedJobs(jobsResponse.jobs);
       setAnalytics(analyticsResponse);
+      setRecentNotifications(notificationsResponse.notifications);
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
       setError('Failed to load dashboard data. Please try again.');
@@ -86,6 +93,65 @@ const Dashboard = () => {
       loadProfilePhoto();
     }
   }, [user, loadProfilePhoto]);
+
+  // Handle redirect context after login
+  useEffect(() => {
+    const handleRedirectContext = () => {
+      const pendingSearchContext = localStorage.getItem('pendingSearchContext');
+      const pendingPreviewContext = localStorage.getItem('pendingPreviewContext');
+      
+      if (pendingSearchContext) {
+        try {
+          const context = JSON.parse(pendingSearchContext);
+          console.log('Dashboard: Found pending search context:', context);
+          
+          // Clear the pending context
+          localStorage.removeItem('pendingSearchContext');
+          
+          // Use the utility function to get the correct navigation path
+          const redirectPath = getNavigationPath({ type: 'search', context });
+          const redirectMessage = getRedirectMessage({ type: 'search', context });
+          
+          console.log('Dashboard: Redirecting to:', redirectPath);
+          if (redirectMessage) {
+            console.log('Dashboard: Redirect message:', redirectMessage);
+          }
+          
+          navigate(redirectPath);
+        } catch (error) {
+          console.error('Dashboard: Error parsing pending search context:', error);
+          localStorage.removeItem('pendingSearchContext');
+        }
+      } else if (pendingPreviewContext) {
+        try {
+          const context = JSON.parse(pendingPreviewContext);
+          console.log('Dashboard: Found pending preview context:', context);
+          
+          // Clear the pending context
+          localStorage.removeItem('pendingPreviewContext');
+          
+          // Use the utility function to get the correct navigation path
+          const redirectPath = getNavigationPath({ type: 'preview', context });
+          const redirectMessage = getRedirectMessage({ type: 'preview', context });
+          
+          console.log('Dashboard: Redirecting to:', redirectPath);
+          if (redirectMessage) {
+            console.log('Dashboard: Redirect message:', redirectMessage);
+          }
+          
+          navigate(redirectPath);
+        } catch (error) {
+          console.error('Dashboard: Error parsing pending preview context:', error);
+          localStorage.removeItem('pendingPreviewContext');
+        }
+      }
+    };
+
+    // Only handle redirect context if we're not loading
+    if (!loading) {
+      handleRedirectContext();
+    }
+  }, [loading, navigate]);
 
   const getIconComponent = (iconName) => {
     const iconMap = {
@@ -106,6 +172,44 @@ const Dashboard = () => {
       'profile': User
     };
     return iconMap[type] || Bell;
+  };
+
+  const getNotificationIcon = (type) => {
+    const iconMap = {
+      'job_posting': Briefcase,
+      'job_application': Briefcase,
+      'skill_endorsement': Award,
+      'profile_update': User,
+      'system_announcement': Bell
+    };
+    return iconMap[type] || Bell;
+  };
+
+  const getNotificationColor = (type) => {
+    const colorMap = {
+      'job_posting': 'blue',
+      'job_application': 'green',
+      'skill_endorsement': 'yellow',
+      'profile_update': 'purple',
+      'system_announcement': 'gray'
+    };
+    return colorMap[type] || 'gray';
+  };
+
+  const formatTimeAgo = (dateString) => {
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInMs = now - date;
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    if (diffInDays < 7) return `${diffInDays}d ago`;
+    
+    return date.toLocaleDateString();
   };
 
   const handleImageClick = () => {
@@ -332,6 +436,61 @@ const Dashboard = () => {
               </div>
             </div>
           )}
+
+          {/* Recent Notifications */}
+          <div className="bg-white rounded-xl p-4 sm:p-6 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Recent Notifications</h3>
+              <Link 
+                to="/notifications" 
+                className="text-blue-600 hover:text-blue-700 text-sm font-semibold flex items-center"
+              >
+                View All
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {recentNotifications.length > 0 ? (
+                recentNotifications.slice(0, 3).map((notification) => {
+                  const IconComponent = getNotificationIcon(notification.type);
+                  const color = getNotificationColor(notification.type);
+                  
+                  return (
+                    <div
+                      key={notification.id}
+                      className={`p-3 rounded-lg border-l-4 ${
+                        !notification.is_read 
+                          ? 'bg-blue-50 border-blue-500' 
+                          : 'bg-gray-50 border-gray-200'
+                      }`}
+                    >
+                      <div className="flex items-start space-x-3">
+                        <div className={`w-6 h-6 bg-${color}-100 rounded-full flex items-center justify-center flex-shrink-0`}>
+                          <IconComponent className={`w-3 h-3 text-${color}-600`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {notification.title}
+                          </p>
+                          <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                            {notification.message}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {formatTimeAgo(notification.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-4">
+                  <Bell className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-500 text-sm">No recent notifications</p>
+                </div>
+              )}
+            </div>
+          </div>
 
         </div>
       </div>

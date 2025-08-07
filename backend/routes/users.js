@@ -14,6 +14,11 @@ const updateUserSchema = Joi.object({
 
 // Get all members for network component
 router.get('/members', authenticateJWT, userController.getAllMembers);
+// Get filter options for network search
+router.get('/network/filter-options', authenticateJWT, userController.getNetworkFilterOptions);
+// Get network member profile (allows authenticated members to view other members)
+router.get('/network/:id', authenticateJWT, userController.getNetworkMemberProfile);
+// These routes must come after the specific routes to avoid conflicts
 router.get('/:id', authenticateJWT, userController.getUserById);
 router.put('/:id', authenticateJWT, validate(updateUserSchema), userController.updateUserById);
 

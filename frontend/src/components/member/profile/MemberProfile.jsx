@@ -28,7 +28,8 @@ const MemberProfile = () => {
     const fetchMemberProfile = async () => {
       try {
         setLoading(true);
-        const response = await api.get(`/users/${id}`);
+        // Use the network route for member profiles
+        const response = await api.get(`/users/network/${id}`);
         setMember(response.data);
         setError(null);
       } catch (err) {

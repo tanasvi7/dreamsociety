@@ -1,8 +1,8 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Users, Briefcase, Star, ArrowRight, Linkedin, Twitter, Facebook, Globe, MessageCircle, Book, Image as LucideImage, Play, Lightbulb } from 'lucide-react';
+import { Users, Briefcase, Star, ArrowRight, Linkedin, Twitter, Facebook, Globe, MessageCircle, Book, Image as LucideImage, Play, Lightbulb, Search } from 'lucide-react';
 import { Carousel, CarouselContent, CarouselItem } from '@/components/ui/carousel';
 import useEmblaCarousel from 'embla-carousel-react';
 import Autoplay from 'embla-carousel-autoplay';
@@ -11,12 +11,20 @@ import { Sheet, SheetTrigger, SheetContent } from '@/components/ui/sheet';
 import { PanelLeft } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import WelcomeHeader from './WelcomeHeader';
-
+import GlobalSearch from '@/components/common/GlobalSearch';
 const WelcomeScreen = () => {
   const isMobile = useIsMobile();
+  const [searchOpen, setSearchOpen] = useState(false);
+
   return (
     <>
       <WelcomeHeader />
+
+      {/* Global Search */}
+      <GlobalSearch 
+        isOpen={searchOpen}
+        onClose={() => setSearchOpen(false)}
+      />
 
       {/* Main Content with Sky Theme and Clouds */}
       <div className="flex flex-col h-screen">
@@ -148,6 +156,8 @@ const WelcomeScreen = () => {
                 </CarouselContent>
               </Carousel>
             </section>
+
+
             {/* Welcome to Unity  - Project Details Vertical Stepper Section */}
             <section className="w-full py-8 md:py-16 bg-[#f4f8fb] border-b border-gray-200">
               <div className="max-w-3xl mx-auto flex flex-col items-center px-4">
@@ -280,6 +290,7 @@ const WelcomeScreen = () => {
 .animate-cloud-move4 { animation: cloud-move4 32s linear infinite; }
 .animate-cloud-move5 { animation: cloud-move5 36s linear infinite; }
 `}</style>
+            {/* Preview Section - Jobs & Network */}
             {/* Features Section - Modern Cards */}
             <section className="w-full px-4 md:px-0 bg-[#fff] relative py-8 md:py-16">
               <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-center mb-8 md:mb-12 text-sky-800 drop-shadow-lg">Why Join the platform?</h2>

@@ -82,8 +82,61 @@ const OTPVerification = () => {
       const result = await verifyOtp({ email: pendingEmail, otp: otpValue });
       
       if (result.success) {
-        console.log('OTP verification successful, navigating to dashboard');
-        navigate('/dashboard');
+        console.log('OTP verification successful, checking for redirect context...');
+        
+        // Check for search or preview redirect context
+        const pendingSearchContext = localStorage.getItem('pendingSearchContext');
+        const pendingPreviewContext = localStorage.getItem('pendingPreviewContext');
+        
+        let redirectPath = '/dashboard';
+        let shouldClearContext = false;
+        
+        if (pendingSearchContext) {
+          try {
+            const context = JSON.parse(pendingSearchContext);
+            const contextAge = Date.now() - context.timestamp;
+            
+            // Only use context if it's less than 5 minutes old
+            if (contextAge < 5 * 60 * 1000) {
+              console.log('OTPVerification: Found search context, will redirect to search results');
+              redirectPath = '/dashboard';
+              shouldClearContext = true;
+            } else {
+              console.log('OTPVerification: Search context expired, clearing');
+              localStorage.removeItem('pendingSearchContext');
+            }
+          } catch (error) {
+            console.error('OTPVerification: Error parsing search context:', error);
+            localStorage.removeItem('pendingSearchContext');
+          }
+        } else if (pendingPreviewContext) {
+          try {
+            const context = JSON.parse(pendingPreviewContext);
+            const contextAge = Date.now() - context.timestamp;
+            
+            // Only use context if it's less than 5 minutes old
+            if (contextAge < 5 * 60 * 1000) {
+              console.log('OTPVerification: Found preview context, will redirect to appropriate section');
+              redirectPath = '/dashboard';
+              shouldClearContext = true;
+            } else {
+              console.log('OTPVerification: Preview context expired, clearing');
+              localStorage.removeItem('pendingPreviewContext');
+            }
+          } catch (error) {
+            console.error('OTPVerification: Error parsing preview context:', error);
+            localStorage.removeItem('pendingPreviewContext');
+          }
+        }
+        
+        console.log('OTPVerification: Final redirect path:', redirectPath);
+        navigate(redirectPath);
+        
+        // Clear the original context after navigation
+        if (shouldClearContext) {
+          localStorage.removeItem('searchRedirectContext');
+          localStorage.removeItem('previewRedirectContext');
+        }
       } else {
         setError(result.error || 'Invalid OTP. Please try again.');
         setOtp(['', '', '', '', '', '']);

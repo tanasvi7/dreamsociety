@@ -110,11 +110,20 @@ const PostJob = () => {
       // Map frontend fields to backend fields
       const payload = {
         title: formData.title,
+        company: formData.company,
         description: formData.description,
         skills_required: formData.skills.join(','),
         job_type: formData.jobType.toLowerCase(),
+        work_model: formData.workModel,
+        experience_required: formData.experience,
+        salary_min: formData.salary.min ? parseFloat(formData.salary.min) : null,
+        salary_max: formData.salary.max ? parseFloat(formData.salary.max) : null,
+        salary_currency: formData.salary.currency,
         salary_range: formData.salary.min && formData.salary.max ? `${formData.salary.min}-${formData.salary.max}` : '',
         location: formData.location,
+        application_deadline: formData.applicationDeadline || null,
+        contact_email: formData.contactEmail,
+        company_website: formData.companyWebsite || null,
         // Optionally add map_lat, map_lng if available
       };
       try {
