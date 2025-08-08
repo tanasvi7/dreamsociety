@@ -1,18 +1,27 @@
 const rateLimit = require('express-rate-limit');
 
+// Check if we're in development mode
+// In development: More lenient rate limits for easier testing
+// In production: Stricter rate limits for security
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 // Rate limiting for login attempts
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 attempts per window
+  windowMs: isDevelopment ? 1 * 60 * 1000 : 15 * 60 * 1000, // 1 minute in dev, 15 minutes in production
+  max: isDevelopment ? 30 : 5, // 30 attempts per minute in dev, 5 per 15 minutes in production
   message: {
-    error: 'Too many login attempts. Please wait 15 minutes before trying again.',
+    error: isDevelopment 
+      ? 'Too many login attempts. Please wait 1 minute before trying again.'
+      : 'Too many login attempts. Please wait 15 minutes before trying again.',
     type: 'rate_limit'
   },
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
     res.status(429).json({
-      error: 'Too many login attempts. Please wait 15 minutes before trying again.',
+      error: isDevelopment 
+        ? 'Too many login attempts. Please wait 1 minute before trying again.'
+        : 'Too many login attempts. Please wait 15 minutes before trying again.',
       type: 'rate_limit'
     });
   }
@@ -20,17 +29,21 @@ const loginLimiter = rateLimit({
 
 // Rate limiting for registration attempts
 const registrationLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 3, // 3 attempts per hour
+  windowMs: isDevelopment ? 1 * 60 * 1000 : 15 * 60 * 1000, // 1 minute in dev, 15 minutes in production
+  max: isDevelopment ? 50 : 10, // 50 attempts per minute in dev, 10 per 15 minutes in production
   message: {
-    error: 'Too many registration attempts. Please wait 1 hour before trying again.',
+    error: isDevelopment 
+      ? 'Too many registration attempts. Please wait 1 minute before trying again.'
+      : 'Too many registration attempts. Please wait 15 minutes before trying again.',
     type: 'rate_limit'
   },
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
     res.status(429).json({
-      error: 'Too many registration attempts. Please wait 1 hour before trying again.',
+      error: isDevelopment 
+        ? 'Too many registration attempts. Please wait 1 minute before trying again.'
+        : 'Too many registration attempts. Please wait 15 minutes before trying again.',
       type: 'rate_limit'
     });
   }
@@ -38,17 +51,21 @@ const registrationLimiter = rateLimit({
 
 // Rate limiting for OTP requests
 const otpLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 3, // 3 OTP requests per 5 minutes
+  windowMs: isDevelopment ? 1 * 60 * 1000 : 5 * 60 * 1000, // 1 minute in dev, 5 minutes in production
+  max: isDevelopment ? 20 : 3, // 20 attempts per minute in dev, 3 per 5 minutes in production
   message: {
-    error: 'Too many OTP requests. Please wait 5 minutes before trying again.',
+    error: isDevelopment 
+      ? 'Too many OTP requests. Please wait 1 minute before trying again.'
+      : 'Too many OTP requests. Please wait 5 minutes before trying again.',
     type: 'rate_limit'
   },
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
     res.status(429).json({
-      error: 'Too many OTP requests. Please wait 5 minutes before trying again.',
+      error: isDevelopment 
+        ? 'Too many OTP requests. Please wait 1 minute before trying again.'
+        : 'Too many OTP requests. Please wait 5 minutes before trying again.',
       type: 'rate_limit'
     });
   }

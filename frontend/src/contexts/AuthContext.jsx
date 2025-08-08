@@ -214,9 +214,30 @@ export const AuthProvider = ({ children }) => {
       };
     } catch (error) {
       console.error('Registration error:', error);
+      
+      // Handle specific backend error messages
+      let errorMessage = 'Registration failed. Please try again.';
+      
+      if (error.response?.data?.message) {
+        const backendMessage = error.response.data.message;
+        
+        // Map backend error messages to user-friendly messages
+        if (backendMessage.includes('Email address is already registered')) {
+          errorMessage = 'Email address is already registered. Please try a different email address.';
+        } else if (backendMessage.includes('Phone number is already registered')) {
+          errorMessage = 'Phone number is already registered. Please try a different phone number.';
+        } else if (backendMessage.includes('Email and phone number are already registered')) {
+          errorMessage = 'Email and phone number are already registered. Please use different credentials.';
+        } else if (backendMessage.includes('Registration already in progress')) {
+          errorMessage = 'Registration already in progress for this email. Please check your email for OTP or try again later.';
+        } else {
+          errorMessage = backendMessage;
+        }
+      }
+      
       return { 
         success: false, 
-        error: error.response?.data?.message || 'Registration failed' 
+        error: errorMessage
       };
     }
   };

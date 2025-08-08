@@ -6,6 +6,40 @@ const { loginLimiter, registrationLimiter, otpLimiter } = require('../middleware
 
 /**
  * @swagger
+ * /auth/check-availability:
+ *   get:
+ *     summary: Check if email or phone is available
+ *     tags: [Auth]
+ *     parameters:
+ *       - in: query
+ *         name: email
+ *         schema:
+ *           type: string
+ *         description: Email to check
+ *       - in: query
+ *         name: phone
+ *         schema:
+ *           type: string
+ *         description: Phone to check
+ *     responses:
+ *       200:
+ *         description: Availability check result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 available:
+ *                   type: boolean
+ *                 conflicts:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ */
+router.get('/check-availability', authController.checkAvailability);
+
+/**
+ * @swagger
  * /auth/register:
  *   post:
  *     summary: Register a new user

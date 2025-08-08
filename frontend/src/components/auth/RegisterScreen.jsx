@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft, Loader } from 'lucide-react';
 import Captcha from '../common/Captcha';
 import TermsAndConditions from '../common/TermsAndConditions';
-import { apiPost } from '../../services/apiService';
+import { apiPost, checkAvailability } from '../../services/apiService';
 import WelcomeHeader from '../welcome/WelcomeHeader';
 
 const RegisterScreen = () => {
@@ -22,6 +22,11 @@ const RegisterScreen = () => {
   const [errors, setErrors] = useState({});
   const [captchaValid, setCaptchaValid] = useState(false);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+  const [isCheckingPhone, setIsCheckingPhone] = useState(false);
+  const [availabilityStatus, setAvailabilityStatus] = useState({
+    email: { available: true, checking: false },
+    phone: { available: true, checking: false }
+  });
   const [showTerms, setShowTerms] = useState(false);
   const { register, loading, pendingRegistration } = useAuth();
   const navigate = useNavigate();
@@ -33,24 +38,109 @@ const RegisterScreen = () => {
     }
   }, [pendingRegistration, navigate]);
 
-  // Debounced email check
+  // Debounced email and phone availability check
   useEffect(() => {
-    const checkEmail = async () => {
+    const checkEmailAvailability = async () => {
       if (formData.email && /\S+@\S+\.\S+/.test(formData.email)) {
-        setIsCheckingEmail(true);
+        setAvailabilityStatus(prev => ({
+          ...prev,
+          email: { ...prev.email, checking: true }
+        }));
         try {
-          // This would be a backend endpoint to check if email exists
-          // For now, we'll rely on the registration error handling
-          setIsCheckingEmail(false);
+          console.log('🔍 Checking email availability in database:', formData.email);
+          const data = await checkAvailability(formData.email);
+          console.log('📧 Database check result:', data);
+          
+          const isAvailable = data.available && !data.conflicts.includes('email');
+          console.log('📧 Email availability:', isAvailable ? 'AVAILABLE' : 'ALREADY EXISTS');
+          
+          setAvailabilityStatus(prev => ({
+            ...prev,
+            email: { 
+              available: isAvailable,
+              checking: false 
+            }
+          }));
+          
+          // Set error if email is not available
+          if (!data.available && data.conflicts.includes('email')) {
+            console.log('❌ Email validation failed: Already registered in database');
+            setErrors(prev => ({
+              ...prev,
+              email: 'Email address is already registered. Please try a different email address.'
+            }));
+          } else if (errors.email && errors.email.includes('already registered')) {
+            console.log('✅ Email validation passed: Available in database');
+            setErrors(prev => ({
+              ...prev,
+              email: ''
+            }));
+          }
         } catch (error) {
-          setIsCheckingEmail(false);
+          console.error('❌ Email availability check error:', error);
+          setAvailabilityStatus(prev => ({
+            ...prev,
+            email: { available: true, checking: false }
+          }));
         }
       }
     };
 
-    const timeoutId = setTimeout(checkEmail, 500);
+    const timeoutId = setTimeout(checkEmailAvailability, 800);
     return () => clearTimeout(timeoutId);
-  }, [formData.email]);
+  }, [formData.email, errors.email]);
+
+  // Debounced phone availability check
+  useEffect(() => {
+    const checkPhoneAvailability = async () => {
+      if (formData.phone && /^\+?[\d\s-()]{10,}$/.test(formData.phone)) {
+        setAvailabilityStatus(prev => ({
+          ...prev,
+          phone: { ...prev.phone, checking: true }
+        }));
+        try {
+          console.log('🔍 Checking phone availability in database:', formData.phone);
+          const data = await checkAvailability(undefined, formData.phone);
+          console.log('📱 Database check result:', data);
+          
+          const isAvailable = data.available && !data.conflicts.includes('phone');
+          console.log('📱 Phone availability:', isAvailable ? 'AVAILABLE' : 'ALREADY EXISTS');
+          
+          setAvailabilityStatus(prev => ({
+            ...prev,
+            phone: { 
+              available: isAvailable,
+              checking: false 
+            }
+          }));
+          
+          // Set error if phone is not available
+          if (!data.available && data.conflicts.includes('phone')) {
+            console.log('❌ Phone validation failed: Already registered in database');
+            setErrors(prev => ({
+              ...prev,
+              phone: 'Phone number is already registered. Please try a different phone number.'
+            }));
+          } else if (errors.phone && errors.phone.includes('already registered')) {
+            console.log('✅ Phone validation passed: Available in database');
+            setErrors(prev => ({
+              ...prev,
+              phone: ''
+            }));
+          }
+        } catch (error) {
+          console.error('❌ Phone availability check error:', error);
+          setAvailabilityStatus(prev => ({
+            ...prev,
+            phone: { available: true, checking: false }
+          }));
+        }
+      }
+    };
+
+    const timeoutId = setTimeout(checkPhoneAvailability, 800);
+    return () => clearTimeout(timeoutId);
+  }, [formData.phone, errors.phone]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -63,12 +153,22 @@ const RegisterScreen = () => {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Email is invalid';
+    } else if (!availabilityStatus.email.available) {
+      console.log('❌ Form validation: Email already exists in database');
+      newErrors.email = 'Email address is already registered. Please try a different email address.';
+    } else {
+      console.log('✅ Form validation: Email is available in database');
     }
     
     if (!formData.phone) {
       newErrors.phone = 'Phone number is required';
     } else if (!/^\+?[\d\s-()]{10,}$/.test(formData.phone)) {
       newErrors.phone = 'Phone number is invalid';
+    } else if (!availabilityStatus.phone.available) {
+      console.log('❌ Form validation: Phone already exists in database');
+      newErrors.phone = 'Phone number is already registered. Please try a different phone number.';
+    } else {
+      console.log('✅ Form validation: Phone is available in database');
     }
     
     if (!formData.password) {
@@ -145,6 +245,7 @@ const RegisterScreen = () => {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+    
     // Clear field error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
@@ -152,11 +253,20 @@ const RegisterScreen = () => {
         [name]: ''
       }));
     }
+    
     // Clear submit error when user starts typing
     if (errors.submit) {
       setErrors(prev => ({
         ...prev,
         submit: ''
+      }));
+    }
+    
+    // Reset availability status when user starts typing
+    if (name === 'email' || name === 'phone') {
+      setAvailabilityStatus(prev => ({
+        ...prev,
+        [name]: { available: true, checking: false }
       }));
     }
   };
@@ -180,7 +290,7 @@ const RegisterScreen = () => {
            }}>
         <div className="max-w-md w-full relative z-10">
           {/* Form Container */}
-          <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/20">
+          <div className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border border-white/20">
             <div className="text-center mb-8">
 
               <h2 className="text-3xl font-bold text-gray-900 mb-2" style={{fontFamily: 'Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>Create Account</h2>
@@ -195,21 +305,28 @@ const RegisterScreen = () => {
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-5 w-5 text-gray-400" />
+                    <User className={`h-5 w-5 ${errors.name ? 'text-red-400' : 'text-gray-400'}`} />
                   </div>
                   <input
                     type="text"
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
-                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 ${
-                      errors.name ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full pl-10 pr-4 py-3 border-2 rounded-lg transition-all duration-300 ${
+                      errors.name 
+                        ? 'border-red-400 bg-red-50 focus:ring-red-200 focus:border-red-500' 
+                        : 'border-gray-300 focus:ring-blue-200 focus:border-blue-500'
                     }`}
                     placeholder="Enter your full name"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
                   />
                   {errors.name && (
-                    <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+                    <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <p className="text-sm text-red-700 font-medium">{errors.name}</p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -221,23 +338,61 @@ const RegisterScreen = () => {
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Mail className="h-5 w-5 text-gray-400" />
+                    <Mail className={`h-5 w-5 ${errors.email || (formData.email && !availabilityStatus.email.checking && !availabilityStatus.email.available) ? 'text-red-400' : formData.email && !availabilityStatus.email.checking && availabilityStatus.email.available ? 'text-green-400' : 'text-gray-400'}`} />
                   </div>
                   <input
                     type="email"
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 ${
-                      errors.email ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full pl-10 pr-12 py-3 border-2 rounded-lg transition-all duration-300 ${
+                      errors.email || (formData.email && !availabilityStatus.email.checking && !availabilityStatus.email.available)
+                        ? 'border-red-400 bg-red-50 focus:ring-red-200 focus:border-red-500' 
+                        : formData.email && !availabilityStatus.email.checking && availabilityStatus.email.available
+                        ? 'border-green-400 bg-green-50 focus:ring-green-200 focus:border-green-500'
+                        : 'border-gray-300 focus:ring-blue-200 focus:border-blue-500'
                     }`}
                     placeholder="Enter your email"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
                   />
-                  {errors.email && (
-                    <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-                  )}
+                  {/* Availability indicator */}
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                    {availabilityStatus.email.checking && (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                    )}
+                    {!availabilityStatus.email.checking && formData.email && (
+                      <>
+                        {availabilityStatus.email.available ? (
+                          <svg className="h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                        ) : (
+                          <svg className="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
+                
+                {/* Error and Success Messages - Outside the relative container */}
+                {errors.email && (
+                  <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <p className="text-sm text-red-700 font-medium">{errors.email}</p>
+                  </div>
+                )}
+                {formData.email && !availabilityStatus.email.checking && availabilityStatus.email.available && !errors.email && (
+                  <div className="mt-2 flex items-center space-x-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                     <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                     </svg>
+                     <p className="text-sm text-green-700 font-medium">✓ Email is available</p>
+                   </div>
+                 )}
               </div>
 
               {/* Phone Field */}
@@ -247,23 +402,61 @@ const RegisterScreen = () => {
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Phone className="h-5 w-5 text-gray-400" />
+                    <Phone className={`h-5 w-5 ${errors.phone || (formData.phone && !availabilityStatus.phone.checking && !availabilityStatus.phone.available) ? 'text-red-400' : formData.phone && !availabilityStatus.phone.checking && availabilityStatus.phone.available ? 'text-green-400' : 'text-gray-400'}`} />
                   </div>
                   <input
                     type="tel"
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 ${
-                      errors.phone ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full pl-10 pr-12 py-3 border-2 rounded-lg transition-all duration-300 ${
+                      errors.phone || (formData.phone && !availabilityStatus.phone.checking && !availabilityStatus.phone.available)
+                        ? 'border-red-400 bg-red-50 focus:ring-red-200 focus:border-red-500' 
+                        : formData.phone && !availabilityStatus.phone.checking && availabilityStatus.phone.available
+                        ? 'border-green-400 bg-green-50 focus:ring-green-200 focus:border-green-500'
+                        : 'border-gray-300 focus:ring-blue-200 focus:border-blue-500'
                     }`}
                     placeholder="+91 9876543210"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
                   />
-                  {errors.phone && (
-                    <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
-                  )}
+                  {/* Availability indicator */}
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                    {availabilityStatus.phone.checking && (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                    )}
+                    {!availabilityStatus.phone.checking && formData.phone && (
+                      <>
+                        {availabilityStatus.phone.available ? (
+                          <svg className="h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                        ) : (
+                          <svg className="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
+                
+                {/* Error and Success Messages - Outside the relative container */}
+                {errors.phone && (
+                  <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <p className="text-sm text-red-700 font-medium">{errors.phone}</p>
+                  </div>
+                )}
+                {formData.phone && !availabilityStatus.phone.checking && availabilityStatus.phone.available && !errors.phone && (
+                  <div className="mt-2 flex items-center space-x-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <p className="text-sm text-green-700 font-medium">✓ Phone number is available</p>
+                  </div>
+                )}
               </div>
 
               {/* Password Field */}
@@ -273,32 +466,39 @@ const RegisterScreen = () => {
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Lock className="h-5 w-5 text-gray-400" />
+                    <Lock className={`h-5 w-5 ${errors.password ? 'text-red-400' : 'text-gray-400'}`} />
                   </div>
                   <input
                     type={showPassword ? 'text' : 'password'}
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
-                    className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 ${
-                      errors.password ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full pl-10 pr-12 py-3 border-2 rounded-lg transition-all duration-300 ${
+                      errors.password 
+                        ? 'border-red-400 bg-red-50 focus:ring-red-200 focus:border-red-500' 
+                        : 'border-gray-300 focus:ring-blue-200 focus:border-blue-500'
                     }`}
                     placeholder="Create a password"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
                   />
                   <button
                     type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center hover:text-gray-600 transition-colors"
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? (
-                      <EyeOff className="h-5 w-5 text-gray-400" />
+                      <EyeOff className="h-5 w-5" />
                     ) : (
-                      <Eye className="h-5 w-5 text-gray-400" />
+                      <Eye className="h-5 w-5" />
                     )}
                   </button>
                   {errors.password && (
-                    <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+                    <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <p className="text-sm text-red-700 font-medium">{errors.password}</p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -310,32 +510,39 @@ const RegisterScreen = () => {
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Lock className="h-5 w-5 text-gray-400" />
+                    <Lock className={`h-5 w-5 ${errors.confirmPassword ? 'text-red-400' : 'text-gray-400'}`} />
                   </div>
                   <input
                     type={showConfirmPassword ? 'text' : 'password'}
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 ${
-                      errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full pl-10 pr-12 py-3 border-2 rounded-lg transition-all duration-300 ${
+                      errors.confirmPassword 
+                        ? 'border-red-400 bg-red-50 focus:ring-red-200 focus:border-red-500' 
+                        : 'border-gray-300 focus:ring-blue-200 focus:border-blue-500'
                     }`}
                     placeholder="Confirm your password"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
                   />
                   <button
                     type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center hover:text-gray-600 transition-colors"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   >
                     {showConfirmPassword ? (
-                      <EyeOff className="h-5 w-5 text-gray-400" />
+                      <EyeOff className="h-5 w-5" />
                     ) : (
-                      <Eye className="h-5 w-5 text-gray-400" />
+                      <Eye className="h-5 w-5" />
                     )}
                   </button>
                   {errors.confirmPassword && (
-                    <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
+                    <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <p className="text-sm text-red-700 font-medium">{errors.confirmPassword}</p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -343,7 +550,12 @@ const RegisterScreen = () => {
               {/* Captcha Field */}
               <Captcha onValidationChange={setCaptchaValid} />
               {errors.captcha && (
-                <p className="mt-1 text-sm text-red-600">{errors.captcha}</p>
+                <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <p className="text-sm text-red-700 font-medium">{errors.captcha}</p>
+                </div>
               )}
 
               {/* Terms and Conditions Checkbox */}
@@ -369,7 +581,12 @@ const RegisterScreen = () => {
                     {' '}of UNITY Nest
                   </label>
                   {errors.acceptTerms && (
-                    <p className="mt-1 text-sm text-red-600">{errors.acceptTerms}</p>
+                    <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <p className="text-sm text-red-700 font-medium">{errors.acceptTerms}</p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -378,11 +595,14 @@ const RegisterScreen = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-cyan-600 hover:scale-105 transition-all duration-300 flex items-center justify-center disabled:opacity-50 shadow-lg"
+                className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-4 rounded-xl font-semibold hover:from-blue-700 hover:to-cyan-600 hover:scale-105 transition-all duration-300 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
                 style={{fontFamily: 'Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
               >
                 {loading ? (
-                  <Loader className="w-5 h-5 animate-spin" />
+                  <div className="flex items-center space-x-2">
+                    <Loader className="w-5 h-5 animate-spin" />
+                    <span>Creating Account...</span>
+                  </div>
                 ) : (
                   'Create Account'
                 )}
@@ -390,12 +610,12 @@ const RegisterScreen = () => {
               
               {/* Submit Error */}
               {errors.submit && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-center shadow-sm">
-                  <div className="flex items-center justify-center">
-                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <div className="bg-red-50 border-2 border-red-200 text-red-700 px-4 py-4 rounded-xl text-center shadow-sm">
+                  <div className="flex items-center justify-center space-x-2">
+                    <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                     </svg>
-                    {errors.submit}
+                    <span className="font-medium">{errors.submit}</span>
                   </div>
                 </div>
               )}

@@ -8,6 +8,50 @@ const { Op } = require('sequelize');
 // Temporary storage for pending registrations (in production, use Redis or database)
 const pendingRegistrations = new Map();
 
+// Check email/phone availability endpoint
+exports.checkAvailability = async (req, res, next) => {
+  try {
+    const { email, phone } = req.query;
+    console.log('🔍 Availability check requested:', { email: email ? 'provided' : 'not provided', phone: phone ? 'provided' : 'not provided' });
+    
+    const result = { available: true, conflicts: [] };
+    
+    if (email) {
+      const normalizedEmail = email.toLowerCase().trim();
+      console.log('📧 Checking email in database:', normalizedEmail);
+      
+      const existingEmail = await User.findOne({ where: { email: normalizedEmail } });
+      console.log('📧 Email database check result:', existingEmail ? 'FOUND - Email already exists' : 'NOT FOUND - Email is available');
+      
+      if (existingEmail) {
+        result.available = false;
+        result.conflicts.push('email');
+        console.log('❌ Email conflict detected:', existingEmail.email);
+      }
+    }
+    
+    if (phone) {
+      const normalizedPhone = phone.trim();
+      console.log('📱 Checking phone in database:', normalizedPhone);
+      
+      const existingPhone = await User.findOne({ where: { phone: normalizedPhone } });
+      console.log('📱 Phone database check result:', existingPhone ? 'FOUND - Phone already exists' : 'NOT FOUND - Phone is available');
+      
+      if (existingPhone) {
+        result.available = false;
+        result.conflicts.push('phone');
+        console.log('❌ Phone conflict detected:', existingPhone.phone);
+      }
+    }
+    
+    console.log('✅ Final availability result:', result);
+    res.json(result);
+  } catch (err) {
+    console.error('❌ Availability check error:', err);
+    next(err);
+  }
+};
+
 exports.register = async (req, res, next) => {
   try {
     const { full_name, email, phone, password } = req.body;
@@ -17,26 +61,48 @@ exports.register = async (req, res, next) => {
       throw new ValidationError('All fields are required');
     }
     
-    // Check if user already exists in database
-    console.log('Checking for existing user with email:', email, 'or phone:', phone);
-    const existing = await User.findOne({ where: { [Op.or]: [{ email }, { phone }] } });
-    console.log('Existing user found:', existing ? 'YES' : 'NO');
+    // Check if user already exists in database with precise error messages
+    console.log('🔍 Registration validation: Checking database for existing user');
+    console.log('📧 Input email:', email);
+    console.log('📱 Input phone:', phone);
     
-    if (existing) {
-      console.log('User already exists with:', { 
-        id: existing.id, 
-        email: existing.email, 
-        phone: existing.phone 
-      });
-      throw new ValidationError('Email or phone already registered');
+    // Normalize email and phone for consistent checking
+    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedPhone = phone.trim();
+    console.log('📧 Normalized email for database check:', normalizedEmail);
+    console.log('📱 Normalized phone for database check:', normalizedPhone);
+    
+    // Check email and phone separately for precise error messages
+    console.log('🔍 Performing database query for email...');
+    const existingEmail = await User.findOne({ where: { email: normalizedEmail } });
+    console.log('📧 Email database query result:', existingEmail ? `FOUND - User ID: ${existingEmail.id}` : 'NOT FOUND - Email is available');
+    
+    console.log('🔍 Performing database query for phone...');
+    const existingPhone = await User.findOne({ where: { phone: normalizedPhone } });
+    console.log('📱 Phone database query result:', existingPhone ? `FOUND - User ID: ${existingPhone.id}` : 'NOT FOUND - Phone is available');
+    
+    if (existingEmail && existingPhone) {
+      console.log('❌ VALIDATION FAILED: Both email and phone already exist in database');
+      console.log('📧 Existing email user ID:', existingEmail.id);
+      console.log('📱 Existing phone user ID:', existingPhone.id);
+      throw new ValidationError('Email and phone number are already registered. Please use different credentials.');
+    } else if (existingEmail) {
+      console.log('❌ VALIDATION FAILED: Email already exists in database');
+      console.log('📧 Existing email user ID:', existingEmail.id);
+      throw new ValidationError('Email address is already registered. Please try a different email address.');
+    } else if (existingPhone) {
+      console.log('❌ VALIDATION FAILED: Phone already exists in database');
+      console.log('📱 Existing phone user ID:', existingPhone.id);
+      throw new ValidationError('Phone number is already registered. Please try a different phone number.');
     }
     
     // Check if there's a pending registration
-    if (pendingRegistrations.has(email)) {
+    if (pendingRegistrations.has(normalizedEmail)) {
+      console.log('❌ VALIDATION FAILED: Registration already in progress for this email');
       throw new ValidationError('Registration already in progress for this email');
     }
     
-    console.log('No existing user found, proceeding with registration...');
+    console.log('✅ VALIDATION PASSED: No existing user found in database, proceeding with registration...');
     
     // Hash password
     const password_hash = await bcrypt.hash(password, 10);
@@ -44,22 +110,22 @@ exports.register = async (req, res, next) => {
     // Store registration data temporarily (don't create user yet)
     const registrationData = {
       full_name,
-      email,
-      phone,
+      email: normalizedEmail,
+      phone: normalizedPhone,
       password_hash,
       timestamp: Date.now()
     };
     
-    pendingRegistrations.set(email, registrationData);
+    pendingRegistrations.set(normalizedEmail, registrationData);
     
     // Send OTP to email
-    const otpResult = await sendOTP(email);
+    const otpResult = await sendOTP(normalizedEmail);
     
     console.log('OTP sent successfully, registration pending verification');
     
     res.status(200).json({ 
       message: 'OTP sent to email. Please verify to complete registration.', 
-      email: email,
+      email: normalizedEmail,
       expiresIn: otpResult.expiresIn
     });
   } catch (err) { 

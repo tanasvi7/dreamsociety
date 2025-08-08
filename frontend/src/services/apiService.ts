@@ -59,6 +59,21 @@ api.interceptors.response.use(
   }
 );
 
+// Check availability function
+export const checkAvailability = async (email?: string, phone?: string) => {
+  try {
+    const params = new URLSearchParams();
+    if (email) params.append('email', email);
+    if (phone) params.append('phone', phone);
+    
+    const response = await api.get(`/auth/check-availability?${params.toString()}`);
+    return response.data;
+  } catch (error) {
+    console.error('Availability check error:', error);
+    throw error;
+  }
+};
+
 export default api;
 
 export const apiPost = (...args: Parameters<typeof api.post>) => api.post(...args);
