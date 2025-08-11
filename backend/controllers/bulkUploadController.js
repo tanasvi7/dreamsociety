@@ -242,10 +242,23 @@ exports.bulkUploadUsers = async (req, res, next) => {
   const { sequelize } = require('../models');
   
   try {
-    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden: Admin access required' });
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    
+    // Check file size
+    if (req.file.size > 10 * 1024 * 1024) {
+      return res.status(400).json({ error: 'File size too large. Maximum size is 10MB' });
+    }
+    
     const ext = path.extname(req.file.originalname).toLowerCase();
-    if (!['.csv', '.xlsx'].includes(ext)) return res.status(400).json({ error: 'Invalid file type' });
+    if (!['.csv', '.xlsx'].includes(ext)) {
+      return res.status(400).json({ error: 'Invalid file type. Only CSV and XLSX files are allowed' });
+    }
 
     // Parse records
     let records = [];
@@ -266,9 +279,24 @@ exports.bulkUploadUsers = async (req, res, next) => {
         });
       }
     } else if (ext === '.xlsx') {
-      const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      records = XLSX.utils.sheet_to_json(sheet);
+      try {
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        records = XLSX.utils.sheet_to_json(sheet);
+      } catch (parseError) {
+        return res.status(400).json({ 
+          error: 'Excel file parsing failed', 
+          details: parseError.message,
+          suggestion: 'Please ensure the Excel file is not corrupted and has valid data'
+        });
+      }
+    }
+
+    if (!records || records.length === 0) {
+      return res.status(400).json({ 
+        error: 'No valid records found in the file',
+        suggestion: 'Please ensure the file contains data and has proper headers'
+      });
     }
 
     let success = 0, failure = 0, errors = [];
@@ -458,6 +486,7 @@ exports.bulkUploadUsers = async (req, res, next) => {
       }
     });
   } catch (err) { 
+    console.error('Bulk upload error:', err);
     next(err); 
   }
 };

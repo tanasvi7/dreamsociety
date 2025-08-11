@@ -10,6 +10,10 @@
     "test:errors": "node test-error-handling.js",
     "migrate": "sequelize db:migrate",
     "seed": "sequelize db:seed:all",
+    "create-admin": "node scripts/createAdminUser.js",
+    "create-admin-seeder": "node scripts/createAdminUserSeeder.js",
+    "seed-admin": "sequelize db:seed --seed 002-production-admin.js",
+    "generate-hash": "node scripts/generatePasswordHash.js",
     "swagger-autogen": "node utils/swaggerGen.js"
   },
   "dependencies": {
