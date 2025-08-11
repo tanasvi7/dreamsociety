@@ -342,7 +342,7 @@ const WelcomeHeader = () => {
                   <div className="flex flex-row items-center gap-3 mb-6">
                     <div className="logo-container flex items-center justify-center rounded-lg border border-gray-200 shadow-sm" style={{padding:'8px',minWidth:'fit-content'}}>
                       <img
-                        src="https://via.placeholder.com/40x40/3498db/ffffff?text=UN"
+                        src="/partners.png"
                         alt="Community Logo"
                         style={{ height: 36, width: 36, objectFit: 'contain', display: 'block', borderRadius: 6 }}
                       />
