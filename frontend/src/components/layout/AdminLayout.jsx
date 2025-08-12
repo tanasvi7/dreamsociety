@@ -7,7 +7,8 @@ import {
   Briefcase, 
   Upload, 
   Shield,
-  LogOut
+  LogOut,
+  CreditCard
 } from 'lucide-react';
 
 const AdminLayout = () => {
@@ -61,6 +62,21 @@ const AdminLayout = () => {
             </li>
             <li>
               <NavLink
+                to="/admin/subscriptions"
+                className={({ isActive }) =>
+                  `w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                    isActive
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                  }`
+                }
+              >
+                <CreditCard className="w-5 h-5" />
+                <span className="font-medium">Subscriptions</span>
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
                 to="/admin/jobs"
                 className={({ isActive }) =>
                   `w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
@@ -104,11 +120,9 @@ const AdminLayout = () => {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <main className="flex-1 p-6 lg:p-8 overflow-y-auto">
-          <Outlet />
-        </main>
-      </div>
+      <main className="flex-1 overflow-hidden">
+        <Outlet />
+      </main>
     </div>
   );
 };

@@ -55,6 +55,7 @@ app.use('/admin', require('./routes/bulkUpload'));
 app.use('/bulkUpload', require('./routes/bulkUpload'));
 app.use('/admin', require('./routes/adminUsers'));
 app.use('/admin', require('./routes/adminExport'));
+app.use('/admin/subscriptions', require('./routes/adminSubscriptions'));
 app.use('/admin/dashboard', adminDashboardRouter);
 app.use('/member/dashboard', memberDashboardRouter);
 app.use('/admin/profiles', adminProfilesRouter);

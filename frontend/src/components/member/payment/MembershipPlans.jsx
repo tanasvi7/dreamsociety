@@ -13,6 +13,7 @@ import {
   Download
 } from 'lucide-react';
 import TermsAndConditions from '../../common/TermsAndConditions';
+import { subscriptionService } from '../../../services/subscriptionService';
 
 const MembershipPlans = () => {
   const [billingCycle, setBillingCycle] = useState('monthly');
@@ -20,6 +21,10 @@ const MembershipPlans = () => {
   const [showQRModal, setShowQRModal] = useState(false);
   const [selectedPlanForQR, setSelectedPlanForQR] = useState(null);
   const [showTerms, setShowTerms] = useState(false);
+  const [transactionNumber, setTransactionNumber] = useState('');
+  const [transactionType, setTransactionType] = useState('upi');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paymentId, setPaymentId] = useState(null);
 
   const plans = [
     {
@@ -88,12 +93,56 @@ const MembershipPlans = () => {
     }
   ];
 
-  const handleSelectPlan = (planId) => {
+  const handleSelectPlan = async (planId) => {
+    if (planId === 'free') {
+      // Handle free plan - no payment needed
+      setSelectedPlan(planId);
+      return;
+    }
+
     setSelectedPlan(planId);
     setSelectedPlanForQR(planId);
     setShowQRModal(true);
-    // Navigate to payment flow
-    // navigate('/payment', { state: { plan: planId, billing: billingCycle } });
+  };
+
+  const handleSubmitPayment = async () => {
+    if (!transactionNumber.trim()) {
+      alert('Please enter the transaction number');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Create payment record with transaction details
+      const paymentData = {
+        amount: plans.find(p => p.id === selectedPlanForQR)?.price[billingCycle] || 0,
+        payment_method: 'upi',
+        transaction_number: transactionNumber,
+        transaction_type: transactionType,
+        plan_type: selectedPlanForQR,
+        billing_cycle: billingCycle
+      };
+
+      const result = await subscriptionService.createPayment(paymentData);
+      alert('Payment submitted successfully!');
+      setShowQRModal(false);
+      setTransactionNumber('');
+      setTransactionType('upi');
+      setPaymentId(null);
+      // Optionally refresh user data or redirect
+    } catch (error) {
+      console.error('Error submitting payment:', error);
+      alert(error.response?.data?.message || 'Failed to submit payment. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setShowQRModal(false);
+    setTransactionNumber('');
+    setTransactionType('upi');
+    setPaymentId(null);
   };
 
   const handleDownloadQR = () => {
@@ -370,76 +419,109 @@ const MembershipPlans = () => {
         {/* QR Code Modal */}
         {showQRModal && (
           <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-4 transform transition-all duration-300 scale-100">
+            <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full mx-4 transform transition-all duration-300 scale-100">
               {/* Header */}
-              <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-t-2xl p-4 text-white">
+              <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-t-xl p-3 text-white">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-lg font-bold">
+                    <h3 className="text-base font-bold">
                       {selectedPlanForQR === 'free' ? 'Free Plan' : 
                        selectedPlanForQR === 'premium' ? 'Premium Plan' : 'Enterprise Plan'}
                     </h3>
-                    <p className="text-blue-100 text-sm">Payment QR Code</p>
+                    <p className="text-blue-100 text-xs">Payment QR Code</p>
                   </div>
                   <button
-                    onClick={() => setShowQRModal(false)}
+                    onClick={handleCloseModal}
                     className="text-white hover:text-blue-100 transition-colors p-1 rounded-full hover:bg-white hover:bg-opacity-20"
                   >
-                    <X className="w-5 h-5" />
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
               </div>
 
               {/* Content */}
-              <div className="p-6">
+              <div className="p-4">
                 {/* Plan Details */}
-                <div className="bg-gray-50 rounded-lg p-3 mb-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <div>
-                      <span className="text-gray-600">Plan:</span>
-                      <span className="font-semibold text-gray-900 ml-2 capitalize">
-                        {selectedPlanForQR === 'free' ? 'Free' : 
-                         selectedPlanForQR === 'premium' ? 'Premium' : 'Enterprise'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Billing:</span>
-                      <span className="font-semibold text-gray-900 ml-2 capitalize">{billingCycle}</span>
-                    </div>
+                <div className="bg-gray-50 rounded-lg p-2 mb-3 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Plan:</span>
+                    <span className="font-semibold text-gray-900 capitalize">
+                      {selectedPlanForQR === 'free' ? 'Free' : 
+                       selectedPlanForQR === 'premium' ? 'Premium' : 'Enterprise'}
+                    </span>
                   </div>
-                  {selectedPlanForQR !== 'free' && (
-                    <div className="mt-2 pt-2 border-t border-gray-200">
-                      <span className="text-gray-600 text-sm">Amount:</span>
-                      <span className="font-bold text-gray-900 ml-2">
-                        ₹{plans.find(p => p.id === selectedPlanForQR)?.price[billingCycle].toLocaleString()}
-                        <span className="text-sm font-normal text-gray-600 ml-1">
-                          /{billingCycle === 'monthly' ? 'month' : 'year'}
-                        </span>
+                  <div className="flex justify-between mt-1">
+                    <span className="text-gray-600">Amount:</span>
+                    <span className="font-bold text-gray-900">
+                      ₹{plans.find(p => p.id === selectedPlanForQR)?.price[billingCycle].toLocaleString()}
+                      <span className="text-xs font-normal text-gray-600 ml-1">
+                        /{billingCycle === 'monthly' ? 'month' : 'year'}
                       </span>
-                    </div>
-                  )}
+                    </span>
+                  </div>
                 </div>
 
                 {/* QR Code Section */}
-                <div className="text-center mb-4">
-                  <div className="inline-block p-3 bg-white border border-gray-200 rounded-xl shadow-md">
+                <div className="text-center mb-3">
+                  <div className="inline-block p-2 bg-white border border-gray-200 rounded-lg shadow-sm">
                     <img 
                       src="/qr.jpg" 
                       alt="Payment QR Code" 
-                      className="w-40 h-40 rounded-lg"
+                      className="w-32 h-32 rounded-lg"
+                    />
+                  </div>
+                </div>
+
+                {/* Transaction Details Form */}
+                <div className="space-y-3 mb-3">
+                  {/* Transaction Type */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Transaction Type
+                    </label>
+                    <select
+                      value={transactionType}
+                      onChange={(e) => setTransactionType(e.target.value)}
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="upi">UPI</option>
+                      <option value="card">Card</option>
+                      <option value="netbanking">Net Banking</option>
+                      <option value="wallet">Wallet</option>
+                    </select>
+                  </div>
+
+                  {/* Transaction Number */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Transaction Number *
+                    </label>
+                    <input
+                      type="text"
+                      value={transactionNumber}
+                      onChange={(e) => setTransactionNumber(e.target.value)}
+                      placeholder="Enter transaction number"
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      required
                     />
                   </div>
                 </div>
 
                 {/* Instructions */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-2 mb-3">
                   <div className="flex items-start">
-                    <div className="flex-shrink-0 w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center mr-2 mt-0.5">
+                    <div className="flex-shrink-0 w-4 h-4 bg-blue-100 rounded-full flex items-center justify-center mr-2 mt-0.5">
                       <span className="text-blue-600 text-xs font-bold">i</span>
                     </div>
-                    <p className="text-blue-800 text-xs">
-                      Scan with UPI app (Google Pay, PhonePe, Paytm) to pay securely.
-                    </p>
+                    <div className="text-blue-800 text-xs">
+                      <p className="mb-1"><strong>Steps:</strong></p>
+                      <ol className="list-decimal list-inside space-y-0.5 text-xs">
+                        <li>Scan QR with UPI app</li>
+                        <li>Complete payment</li>
+                        <li>Enter transaction number</li>
+                        <li>Click Complete</li>
+                      </ol>
+                    </div>
                   </div>
                 </div>
 
@@ -447,24 +529,32 @@ const MembershipPlans = () => {
                 <div className="flex gap-2">
                   <button
                     onClick={handleDownloadQR}
-                    className="flex-1 flex items-center justify-center px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 font-semibold text-sm shadow-md hover:shadow-lg"
+                    className="flex-1 flex items-center justify-center px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-all duration-200 font-medium text-xs shadow-sm"
                   >
-                    <Download className="w-4 h-4 mr-1" />
+                    <Download className="w-3 h-3 mr-1" />
                     Download
                   </button>
                   
                   <button
-                    onClick={() => setShowQRModal(false)}
-                    className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all duration-200 font-semibold text-sm"
+                    onClick={handleSubmitPayment}
+                    disabled={isSubmitting || !transactionNumber.trim()}
+                    className="flex-1 px-3 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-md hover:from-blue-700 hover:to-purple-700 transition-all duration-200 font-medium text-xs shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? 'Processing...' : 'Complete'}
+                  </button>
+                  
+                  <button
+                    onClick={handleCloseModal}
+                    className="flex-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-all duration-200 font-medium text-xs"
                   >
                     Close
                   </button>
                 </div>
 
                 {/* Security Note */}
-                <div className="mt-3 text-center">
+                <div className="mt-2 text-center">
                   <p className="text-xs text-gray-500">
-                    🔒 Bank-level security
+                    🔒 Secure payment
                   </p>
                 </div>
               </div>

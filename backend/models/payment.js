@@ -20,6 +20,13 @@ module.exports = (sequelize) => {
       defaultValue: 'pending'
     },
     transaction_id: DataTypes.STRING(100),
+    transaction_number: DataTypes.STRING(100),
+    transaction_type: {
+      type: DataTypes.ENUM('upi', 'card', 'netbanking', 'wallet'),
+      defaultValue: 'upi'
+    },
+    admin_notes: DataTypes.TEXT,
+    rejection_reason: DataTypes.STRING(200),
     payment_time: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW

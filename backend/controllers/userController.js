@@ -1,4 +1,4 @@
-const { User, Profile, EducationDetail, EmploymentDetail } = require('../models');
+const { User, Profile, EducationDetail, EmploymentDetail, FamilyMember } = require('../models');
 const { NotFoundError, ValidationError } = require('../middlewares/errorHandler');
 const { Op } = require('sequelize');
 
@@ -60,6 +60,12 @@ exports.getNetworkMemberProfile = async (req, res, next) => {
           as: 'employmentDetails',
           attributes: ['role', 'company_name', 'years_of_experience', 'currently_working'],
           order: [['id', 'DESC']]
+        },
+        {
+          model: FamilyMember,
+          as: 'familyMembers',
+          attributes: ['name', 'relation', 'education', 'profession'],
+          order: [['id', 'ASC']]
         }
       ]
     });
@@ -121,7 +127,15 @@ exports.getAllMembers = async (req, res, next) => {
     const searchTerm = search ? search.trim() : '';
     
     // Check if any search criteria is provided
-    const hasSearchCriteria = searchTerm || district || caste;
+    const hasSearchCriteria = searchTerm || 
+      (district && district !== '') || 
+      (caste && caste !== '') || 
+      (experience && experience !== '') || 
+      (education && education !== '') || 
+      (company && company !== '');
+    
+    // Always include profile for location display, but only require it for location filters
+    const shouldIncludeProfile = hasSearchCriteria || true; // Always include for location display
     
     if (!hasSearchCriteria) {
       // Return empty results if no search criteria provided
@@ -156,14 +170,17 @@ exports.getAllMembers = async (req, res, next) => {
       ];
     }
 
-    // Add additional filters (only profile-based filters for now)
-    if (district) {
-      where['$profile.district$'] = { [Op.like]: `%${district}%` };
+    // Add additional filters
+    if (district && district !== '') {
+      where['$profile.district$'] = district;
     }
     
-    if (caste) {
-      where['$profile.caste$'] = { [Op.like]: `%${caste}%` };
+    if (caste && caste !== '') {
+      where['$profile.caste$'] = caste;
     }
+
+    // Note: We'll handle education, company, and experience filters in the include conditions
+    // since they require the related tables to be joined
 
     // Build order clause
     let order = [];
@@ -178,34 +195,43 @@ exports.getAllMembers = async (req, res, next) => {
         order = [['created_at', 'DESC']];
     }
 
-    // Use findAndCountAll for all queries since we're only searching in profile table
+    // Determine which includes should be required based on filters
+    const includeProfile = {
+      model: Profile,
+      as: 'profile',
+      attributes: ['photo_url', 'village', 'mandal', 'district', 'native_place', 'caste', 'subcaste'],
+      required: (district && district !== '') || (caste && caste !== ''),
+      // Always include profile for location display
+      separate: false
+    };
+
+    const includeEducation = {
+      model: EducationDetail,
+      as: 'educationDetails',
+      attributes: ['degree', 'institution', 'year_of_passing', 'grade'],
+      limit: 1,
+      order: [['id', 'DESC']],
+      required: !!(education && education !== ''),
+      where: (education && education !== '') ? { degree: education } : undefined
+    };
+
+    const includeEmployment = {
+      model: EmploymentDetail,
+      as: 'employmentDetails',
+      attributes: ['role', 'company_name', 'years_of_experience', 'currently_working'],
+      limit: 1,
+      order: [['id', 'DESC']],
+      required: !!(company && company !== '') || !!(experience && experience !== ''),
+      where: ((company && company !== '') || (experience && experience !== '')) ? {
+        ...((company && company !== '') && { company_name: company }),
+        ...((experience && experience !== '') && { years_of_experience: { [Op.gte]: parseInt(experience) } })
+      } : undefined
+    };
+
     const result = await User.findAndCountAll({
       where,
       attributes: { exclude: ['password_hash'] },
-      include: [
-        {
-          model: Profile,
-          as: 'profile',
-          attributes: ['photo_url', 'village', 'mandal', 'district', 'native_place', 'caste', 'subcaste'],
-          required: false
-        },
-        {
-          model: EducationDetail,
-          as: 'educationDetails',
-          attributes: ['degree', 'institution', 'year_of_passing', 'grade'],
-          limit: 1,
-          order: [['id', 'DESC']],
-          required: false
-        },
-        {
-          model: EmploymentDetail,
-          as: 'employmentDetails',
-          attributes: ['role', 'company_name', 'years_of_experience', 'currently_working'],
-          limit: 1,
-          order: [['id', 'DESC']],
-          required: false
-        }
-      ],
+      include: [includeProfile, includeEducation, includeEmployment],
       limit: limitNum,
       offset: (pageNum - 1) * limitNum,
       order
@@ -258,41 +284,45 @@ exports.getAllMembers = async (req, res, next) => {
 // Get filter options for network search
 exports.getNetworkFilterOptions = async (req, res, next) => {
   try {
-    // Get unique districts
+    // Get unique districts (excluding null/empty)
     const districts = await Profile.findAll({
       attributes: ['district'],
       where: {
-        district: { [Op.ne]: null }
+        district: { [Op.ne]: null },
+        district: { [Op.ne]: '' }
       },
       group: ['district'],
       order: [['district', 'ASC']]
     });
 
-    // Get unique castes
+    // Get unique castes (excluding null/empty)
     const castes = await Profile.findAll({
       attributes: ['caste'],
       where: {
-        caste: { [Op.ne]: null }
+        caste: { [Op.ne]: null },
+        caste: { [Op.ne]: '' }
       },
       group: ['caste'],
       order: [['caste', 'ASC']]
     });
 
-    // Get unique education degrees
+    // Get unique education degrees (excluding null/empty)
     const educationDegrees = await EducationDetail.findAll({
       attributes: ['degree'],
       where: {
-        degree: { [Op.ne]: null }
+        degree: { [Op.ne]: null },
+        degree: { [Op.ne]: '' }
       },
       group: ['degree'],
       order: [['degree', 'ASC']]
     });
 
-    // Get unique companies
+    // Get unique companies (excluding null/empty)
     const companies = await EmploymentDetail.findAll({
       attributes: ['company_name'],
       where: {
-        company_name: { [Op.ne]: null }
+        company_name: { [Op.ne]: null },
+        company_name: { [Op.ne]: '' }
       },
       group: ['company_name'],
       order: [['company_name', 'ASC']]
@@ -308,4 +338,21 @@ exports.getNetworkFilterOptions = async (req, res, next) => {
     console.error('Error in getNetworkFilterOptions:', err);
     next(err);
   }
+}; 
+
+exports.getSubscriptionStatus = async (req, res, next) => {
+  try {
+    const user = await User.findByPk(req.user.id, {
+      attributes: ['id', 'is_subscribed']
+    });
+    
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+    
+    res.json({ 
+      is_subscribed: user.is_subscribed,
+      user_id: user.id
+    });
+  } catch (err) { next(err); }
 }; 

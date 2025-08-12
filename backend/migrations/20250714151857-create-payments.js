@@ -24,6 +24,11 @@ module.exports = {
         defaultValue: 'pending'
       },
       transaction_id: Sequelize.STRING(100),
+      transaction_number: Sequelize.STRING(100),
+      transaction_type: {
+        type: Sequelize.ENUM('upi', 'card', 'netbanking', 'wallet'),
+        defaultValue: 'upi'
+      },
       payment_time: {
         type: Sequelize.DATE,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')

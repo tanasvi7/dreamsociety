@@ -71,7 +71,7 @@ export const networkService = {
 
     if (filters) {
       Object.entries(filters).forEach(([key, value]) => {
-        if (value && value.trim()) {
+        if (value && value.trim() && value !== '') {
           params.append(key, value.trim());
         }
       });

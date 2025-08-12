@@ -29,6 +29,7 @@ import AdminDashboard from "./components/admin/AdminDashboard";
 import AdminUserManagement from "./components/admin/AdminUserManagement";
 import AdminJobManagement from "./components/admin/AdminJobManagement";
 import AdminBulkUpload from "./components/admin/AdminBulkUpload";
+import AdminSubscriptionManagement from "./components/admin/AdminSubscriptionManagement";
 
 import About from './components/welcome/About';
 import Society from './components/welcome/Society';
@@ -77,6 +78,7 @@ const App = () => (
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<AdminDashboard />} />
                 <Route path="users" element={<AdminUserManagement />} />
+                <Route path="subscriptions" element={<AdminSubscriptionManagement />} />
                 <Route path="jobs" element={<AdminJobManagement />} />
                 <Route path="bulk-upload" element={<AdminBulkUpload />} />
 

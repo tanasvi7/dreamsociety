@@ -12,6 +12,8 @@ const updateUserSchema = Joi.object({
   role: Joi.string().valid('member', 'admin', 'moderator')
 });
 
+// Get subscription status
+router.get('/subscription/status', authenticateJWT, userController.getSubscriptionStatus);
 // Get all members for network component
 router.get('/members', authenticateJWT, userController.getAllMembers);
 // Get filter options for network search

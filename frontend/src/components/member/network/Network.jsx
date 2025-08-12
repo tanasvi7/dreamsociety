@@ -82,12 +82,12 @@ const Network = () => {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (searchTerm !== '' && hasSearched) {
-        fetchMembers(1, searchTerm, sortBy);
+        fetchMembers(1, searchTerm, sortBy, filters);
       }
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, sortBy, hasSearched]);
+  }, [searchTerm, sortBy, hasSearched, filters]);
 
   useEffect(() => {
     fetchFilterOptions();
@@ -96,7 +96,7 @@ const Network = () => {
   const handleSearch = () => {
     if (searchTerm.trim() || !searchTerm) {
       setHasSearched(true);
-      fetchMembers(1, searchTerm, sortBy);
+      fetchMembers(1, searchTerm, sortBy, filters);
     }
   };
 
@@ -115,16 +115,16 @@ const Network = () => {
   const handleSortChange = (value) => {
     setSortBy(value);
     if (hasSearched) {
-      fetchMembers(1, searchTerm, value);
+      fetchMembers(1, searchTerm, value, filters);
     }
   };
 
   const handleFilterChange = (filterType, value) => {
     const newFilters = { ...filters, [filterType]: value };
     setFilters(newFilters);
-    if (hasSearched) {
-      fetchMembers(1, searchTerm, sortBy, newFilters);
-    }
+    // Always trigger search when filter changes (including when cleared)
+    setHasSearched(true);
+    fetchMembers(1, searchTerm, sortBy, newFilters);
   };
 
   const handleClearFilters = () => {
@@ -135,20 +135,32 @@ const Network = () => {
       company: ''
     };
     setFilters(clearedFilters);
-    if (hasSearched) {
-      fetchMembers(1, searchTerm, sortBy, clearedFilters);
-    }
+    // Trigger search when filters are cleared, even if no search term
+    setHasSearched(true);
+    fetchMembers(1, searchTerm, sortBy, clearedFilters);
   };
 
   const handleLoadMore = () => {
     if (pagination.page < pagination.pages) {
-      fetchMembers(pagination.page + 1, searchTerm, sortBy);
+      fetchMembers(pagination.page + 1, searchTerm, sortBy, filters);
     }
   };
 
-  const handleViewProfile = (member) => {
-    setSelectedMember(member);
-    setIsModalOpen(true);
+  const handleViewProfile = async (member) => {
+    try {
+      setLoading(true);
+      // Fetch detailed member information including family details
+      const detailedMember = await networkService.getMemberProfile(member.id);
+      setSelectedMember(detailedMember);
+      setIsModalOpen(true);
+    } catch (err) {
+      console.error('Error fetching member details:', err);
+      // Fallback to basic member info if detailed fetch fails
+      setSelectedMember(member);
+      setIsModalOpen(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCloseModal = () => {
