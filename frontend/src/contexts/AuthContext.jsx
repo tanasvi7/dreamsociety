@@ -172,6 +172,19 @@ export const AuthProvider = ({ children }) => {
           const response = await api.get('/auth/me');
           console.log('AuthContext: /auth/me response:', response.data);
           setUser(response.data.user);
+          
+          // Also fetch subscription status if user exists
+          if (response.data.user) {
+            try {
+              const subscriptionResponse = await api.get('/users/subscription/status');
+              setUser(prevUser => ({
+                ...prevUser,
+                is_subscribed: subscriptionResponse.data.is_subscribed
+              }));
+            } catch (error) {
+              console.error('Error fetching subscription status:', error);
+            }
+          }
         }
       } catch (error) {
         console.error('Auth check failed:', error);
@@ -207,6 +220,17 @@ export const AuthProvider = ({ children }) => {
       console.log('AuthContext: Token stored, setting user:', userData);
       setUser(userData);
       console.log('AuthContext: User state updated, should trigger re-render');
+      
+      // Fetch subscription status after login
+      try {
+        const subscriptionResponse = await api.get('/users/subscription/status');
+        setUser(prevUser => ({
+          ...prevUser,
+          is_subscribed: subscriptionResponse.data.is_subscribed
+        }));
+      } catch (error) {
+        console.error('Error fetching subscription status after login:', error);
+      }
       
       // Reset profile photo state after login
       setProfilePhoto({ url: null, loading: false, error: null, lastLoaded: null });

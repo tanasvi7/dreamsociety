@@ -321,11 +321,11 @@ exports.bulkUploadUsers = async (req, res, next) => {
         continue;
       }
 
-      // Validate phone format (basic validation for Indian numbers)
-      const phoneRegex = /^\+91\s?\d{10}$/;
+      // Validate phone format (10 digits only)
+      const phoneRegex = /^\d{10}$/;
       if (!phoneRegex.test(phone)) {
         failure++;
-        errors.push({ email, phone, error: 'Invalid phone format. Use +91 followed by 10 digits' });
+        errors.push({ email, phone, error: 'Invalid phone format. Use exactly 10 digits' });
         continue;
       }
 

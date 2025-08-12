@@ -13,12 +13,16 @@ import {
   Users,
   Star,
   Plus,
-  User
+  User,
+  Eye,
+  Send
 } from 'lucide-react';
 import JobCard from './JobCard';
 import MyJobPosts from './MyJobPosts';
 import { apiGet } from '../../../services/apiService';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useSubscription } from '../../../hooks/useSubscription';
+import SubscriptionPrompt from '../../common/SubscriptionPrompt';
 
 const JobPortal = () => {
   const [jobs, setJobs] = useState([]);
@@ -31,6 +35,7 @@ const JobPortal = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [activeTab, setActiveTab] = useState('browse');
   const { user } = useAuth();
+  const { is_subscribed, loading: subscriptionLoading } = useSubscription();
 
   useEffect(() => {
     const fetchJobs = async () => {
@@ -214,6 +219,22 @@ const JobPortal = () => {
               {loading ? 'Loading jobs...' : error ? error : `Showing ${filteredJobs.length} of ${jobs.length} jobs`}
             </p>
           </div>
+
+          {/* Subscription Prompt for non-subscribed users */}
+          {!is_subscribed && !subscriptionLoading && (
+            <div className="mb-8">
+              <SubscriptionPrompt 
+                title="Unlock Job Application Features"
+                description="Subscribe to apply for jobs and access detailed job information"
+                features={[
+                  { icon: Briefcase, text: "Apply for jobs" },
+                  { icon: Eye, text: "View job details" },
+                  { icon: Send, text: "Submit applications" },
+                  { icon: Star, text: "Priority access" }
+                ]}
+              />
+            </div>
+          )}
 
           {/* Job Listings */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

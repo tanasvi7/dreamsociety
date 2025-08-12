@@ -17,6 +17,7 @@ import ProfileManagement from './components/member/profile/ProfileManagement';
 import JobPortal from './components/member/jobs/JobPortal';
 import JobDetails from './components/member/jobs/JobDetails';
 import PostJob from './components/member/jobs/PostJob';
+import EditJob from './components/member/jobs/EditJob';
 import Notifications from './components/member/Notifications';
 // import AdminPanel from './components/admin/AdminPanel';
 import PaymentFlow from './components/member/payment/PaymentFlow';
@@ -66,6 +67,7 @@ const App = () => (
                 <Route path="/jobs" element={<JobPortal />} />
                 <Route path="/jobs/:id" element={<JobDetails />} />
                 <Route path="/post-job" element={<PostJob />} />
+                <Route path="/edit-job/:id" element={<EditJob />} />
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/network" element={<Network />} />
                 <Route path="/network/:id" element={<MemberProfile />} />

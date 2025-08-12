@@ -51,9 +51,9 @@ async function testDatabaseValidation() {
     // Test 4: Test phone validation logic
     console.log('4️⃣ Testing phone validation logic...');
     const testPhones = [
-      '+91 9876543210',
-      ' +91 9876543210 ',
-      '+91 1234567890',
+      '9876543210',
+      ' 9876543210 ',
+      '1234567890',
       'nonexistent-phone'
     ];
     
@@ -73,7 +73,7 @@ async function testDatabaseValidation() {
     // Test 5: Test the exact validation logic used in the controller
     console.log('5️⃣ Testing exact controller validation logic...');
     const testEmail = 'test@example.com';
-    const testPhone = '+91 9876543210';
+    const testPhone = '9876543210';
     
     const normalizedEmail = testEmail.toLowerCase().trim();
     const normalizedPhone = testPhone.trim();

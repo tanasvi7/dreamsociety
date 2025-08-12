@@ -137,7 +137,7 @@ const AdminBulkUpload = () => {
               <ul className="list-disc list-inside mt-1 space-y-1">
                 <li>full_name</li>
                 <li>email</li>
-                <li>phone (+91 format)</li>
+                <li>phone (10 digits only)</li>
                 <li>password</li>
               </ul>
             </div>

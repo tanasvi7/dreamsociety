@@ -45,7 +45,7 @@ npm run generate-hash
 ## Default Credentials
 - **Email**: `admin@dreamssociety.in`
 - **Password**: `DreamSociety2024!`
-- **Phone**: `+919876543210`
+- **Phone**: `9876543210`
 
 ## Post-Setup Security
 - [ ] Change default password immediately

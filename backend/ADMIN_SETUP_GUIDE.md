@@ -14,7 +14,7 @@ npx sequelize-cli db:seed --seed 002-production-admin.js
 The seeder will create an admin user with the following credentials:
 - **Email**: `admin@dreamssociety.in`
 - **Password**: `DreamSociety2024!`
-- **Phone**: `+919876543210`
+- **Phone**: `9876543210`
 - **Role**: `admin`
 - **Status**: `verified`
 
@@ -97,7 +97,7 @@ If you get an error that the admin user already exists:
 |-------|-------|
 | Email | `admin@dreamssociety.in` |
 | Password | `DreamSociety2024!` |
-| Phone | `+919876543210` |
+| Phone | `9876543210` |
 | Role | `admin` |
 | Verified | `true` |
 

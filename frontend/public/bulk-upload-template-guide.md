@@ -9,7 +9,7 @@ The template is in Excel (.xlsx) format and can be opened in Microsoft Excel, Go
 ## Required Fields (Must be filled)
 - **full_name**: User's full name (e.g., "John Doe")
 - **email**: Valid email address (e.g., "john.doe@example.com")
-- **phone**: Phone number with country code (e.g., "+91 9876543210")
+- **phone**: Phone number (10 digits only, e.g., "9876543210")
 - **password**: User's password (will be hashed automatically)
 
 ## Optional Profile Fields
@@ -54,7 +54,7 @@ For each family member (1, 2, or 3), include:
 3. **Boolean values**: Use "true" or "false" (lowercase) for currently_working fields
 4. **Decimal numbers**: Use decimal format for years of experience (e.g., "5.00", "3.50")
 5. **Email**: Must be a valid email format
-6. **Phone**: Include country code (e.g., "+91 9876543210")
+6. **Phone**: Use exactly 10 digits (e.g., "9876543210")
 
 ### Validation Rules:
 1. **Required fields**: full_name, email, phone, password cannot be empty
@@ -74,7 +74,7 @@ For each family member (1, 2, or 3), include:
 1. **Capitalized gender**: Use "male" not "Male"
 2. **Wrong date format**: Use "1990-05-15" not "15/05/1990"
 3. **Wrong boolean format**: Use "true"/"false" not "Yes"/"No"
-4. **Missing country code**: Include "+91" in phone numbers
+4. **Invalid phone format**: Use exactly 10 digits for phone numbers
 5. **Invalid email**: Ensure email format is correct
 6. **Column count mismatch**: Ensure all data rows have exactly 48 columns (same as header)
 7. **Missing commas**: Don't skip commas for empty fields - use empty values instead

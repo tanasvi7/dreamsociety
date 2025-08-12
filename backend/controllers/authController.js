@@ -388,7 +388,8 @@ exports.getMe = async (req, res, next) => {
         full_name: user.full_name,
         email: user.email,
         phone: user.phone,
-        role: user.role
+        role: user.role,
+        is_subscribed: user.is_subscribed
       }
     });
   } catch (err) { next(err); }

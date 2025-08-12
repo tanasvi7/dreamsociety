@@ -222,12 +222,7 @@ const RegisterScreen = () => {
     }
     
     if (validateForm()) {
-<<<<<<< HEAD
       setIsSendingOtp(true); // Start the specific OTP sending loading state
-=======
-      setSubmitAttempts(prev => prev + 1);
-      
->>>>>>> 4005cf3262bcc943e25cb00d9a23fb202eabee2f
       try {
         console.log('Starting registration process...');
         
@@ -659,11 +654,7 @@ const RegisterScreen = () => {
               {/* Submit Button */}
               <button
                 type="submit"
-<<<<<<< HEAD
                 disabled={loading || isSendingOtp}
-=======
-                disabled={loading || submitAttempts >= 3}
->>>>>>> 4005cf3262bcc943e25cb00d9a23fb202eabee2f
                 className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-4 rounded-xl font-semibold hover:from-blue-700 hover:to-cyan-600 hover:scale-105 transition-all duration-300 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
                 style={{fontFamily: 'Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
               >

@@ -77,13 +77,18 @@ export const networkService = {
       });
     }
 
+    console.log('API request URL:', `/users/members?${params}`);
+    console.log('API request params:', Object.fromEntries(params.entries()));
+    
     const response = await api.get(`/users/members?${params}`);
     return response.data;
   },
 
   // Get filter options for network search
   getFilterOptions: async (): Promise<FilterOptions> => {
+    console.log('Fetching filter options...');
     const response = await api.get('/users/network/filter-options');
+    console.log('Filter options response:', response.data);
     return response.data;
   },
 

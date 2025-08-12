@@ -1,4 +1,4 @@
-const { User, Profile, EducationDetail, EmploymentDetail, FamilyMember } = require('../models');
+const { User, Profile, EducationDetail, EmploymentDetail, FamilyMember, sequelize } = require('../models');
 const { NotFoundError, ValidationError } = require('../middlewares/errorHandler');
 const { Op } = require('sequelize');
 
@@ -119,6 +119,9 @@ exports.getAllMembers = async (req, res, next) => {
       education,
       company
     } = req.query;
+    
+    console.log('Filter parameters:', { district, caste, experience, education, company });
+    console.log('User ID (excluded):', req.user.id);
     const offset = (page - 1) * limit;
     
     // Validate and sanitize inputs
@@ -205,40 +208,132 @@ exports.getAllMembers = async (req, res, next) => {
       separate: false
     };
 
-    const includeEducation = {
-      model: EducationDetail,
-      as: 'educationDetails',
-      attributes: ['degree', 'institution', 'year_of_passing', 'grade'],
-      limit: 1,
-      order: [['id', 'DESC']],
-      required: !!(education && education !== ''),
-      where: (education && education !== '') ? { degree: education } : undefined
-    };
+    // Build include conditions with proper filtering
+    const includes = [includeProfile];
 
-    const includeEmployment = {
-      model: EmploymentDetail,
-      as: 'employmentDetails',
-      attributes: ['role', 'company_name', 'years_of_experience', 'currently_working'],
-      limit: 1,
-      order: [['id', 'DESC']],
-      required: !!(company && company !== '') || !!(experience && experience !== ''),
-      where: ((company && company !== '') || (experience && experience !== '')) ? {
-        ...((company && company !== '') && { company_name: company }),
-        ...((experience && experience !== '') && { years_of_experience: { [Op.gte]: parseInt(experience) } })
-      } : undefined
-    };
+    // Add education filter if specified
+    if (education && education !== '') {
+      // Use a subquery approach for education filtering
+      const educationSubquery = `EXISTS (
+        SELECT 1 FROM education_details 
+        WHERE education_details.user_id = User.id 
+        AND education_details.degree = '${education}'
+      )`;
+      
+      where[Op.and] = where[Op.and] || [];
+      where[Op.and].push(sequelize.literal(educationSubquery));
+      
+      includes.push({
+        model: EducationDetail,
+        as: 'educationDetails',
+        attributes: ['degree', 'institution', 'year_of_passing', 'grade'],
+        where: { degree: education }, // Add this to ensure we get the filtered degree
+        limit: 1,
+        order: [['id', 'DESC']],
+        required: false
+      });
+      console.log('Education filter applied: degree =', education);
+      console.log('Education subquery:', educationSubquery);
+    } else {
+      // Include education without filtering
+      includes.push({
+        model: EducationDetail,
+        as: 'educationDetails',
+        attributes: ['degree', 'institution', 'year_of_passing', 'grade'],
+        limit: 1,
+        order: [['id', 'DESC']],
+        required: false
+      });
+      console.log('No education filter applied');
+    }
 
-    const result = await User.findAndCountAll({
+    // Add employment filter if specified
+    if (company && company !== '' || experience && experience !== '') {
+      const employmentConditions = [];
+      
+      if (company && company !== '') {
+        employmentConditions.push(`employment_details.company_name = '${company}'`);
+        console.log('Company filter applied: company =', company);
+      }
+      
+      if (experience && experience !== '') {
+        const expValue = parseFloat(experience);
+        if (!isNaN(expValue)) {
+          employmentConditions.push(`employment_details.years_of_experience >= ${expValue}`);
+          console.log('Experience filter applied: min years =', expValue);
+        }
+      }
+      
+      if (employmentConditions.length > 0) {
+        const employmentSubquery = `EXISTS (
+          SELECT 1 FROM employment_details 
+          WHERE employment_details.user_id = User.id 
+          AND (${employmentConditions.join(' AND ')})
+        )`;
+        
+        where[Op.and] = where[Op.and] || [];
+        where[Op.and].push(sequelize.literal(employmentSubquery));
+      }
+      
+      includes.push({
+        model: EmploymentDetail,
+        as: 'employmentDetails',
+        attributes: ['role', 'company_name', 'years_of_experience', 'currently_working'],
+        limit: 1,
+        order: [['id', 'DESC']],
+        required: false
+      });
+    } else {
+      // Include employment without filtering
+      includes.push({
+        model: EmploymentDetail,
+        as: 'employmentDetails',
+        attributes: ['role', 'company_name', 'years_of_experience', 'currently_working'],
+        limit: 1,
+        order: [['id', 'DESC']],
+        required: false
+      });
+      console.log('No employment filter applied');
+    }
+
+    console.log('Query includes:', JSON.stringify(includes, null, 2));
+    console.log('Final where clause:', JSON.stringify(where, null, 2));
+    
+    // Log the raw SQL query for debugging
+    const queryOptions = {
       where,
       attributes: { exclude: ['password_hash'] },
-      include: [includeProfile, includeEducation, includeEmployment],
+      include: includes,
       limit: limitNum,
       offset: (pageNum - 1) * limitNum,
       order
-    });
+    };
+    
+    console.log('Query options:', JSON.stringify(queryOptions, null, 2));
+    
+    const result = await User.findAndCountAll(queryOptions);
     
     const count = result.count;
     const users = result.rows;
+
+    console.log(`Found ${count} total users, returning ${users.length} users`);
+    
+    // Debug: Check if the returned users actually have the filtered education
+    if (education && education !== '' && users.length > 0) {
+      console.log('Checking returned users for education filter:');
+      users.forEach((user, index) => {
+        const userEducation = user.educationDetails?.[0]?.degree;
+        console.log(`  User ${index + 1}: ${user.full_name} - Education: "${userEducation}" (Expected: "${education}")`);
+      });
+    }
+    
+    console.log('Sample user data:', users.length > 0 ? {
+      id: users[0].id,
+      name: users[0].full_name,
+      education: users[0].educationDetails?.[0]?.degree,
+      company: users[0].employmentDetails?.[0]?.company_name,
+      experience: users[0].employmentDetails?.[0]?.years_of_experience
+    } : 'No users found');
 
     // Transform data for frontend
     const members = users.map(user => ({
@@ -266,6 +361,11 @@ exports.getAllMembers = async (req, res, next) => {
       joinedDate: user.created_at
     }));
 
+    console.log('Transformed members data:');
+    members.forEach((member, index) => {
+      console.log(`  Member ${index + 1}: ${member.name} - Education: "${member.education}"`);
+    });
+
     res.json({
       members,
       pagination: {
@@ -284,12 +384,16 @@ exports.getAllMembers = async (req, res, next) => {
 // Get filter options for network search
 exports.getNetworkFilterOptions = async (req, res, next) => {
   try {
+    console.log('Fetching filter options...');
+    
     // Get unique districts (excluding null/empty)
     const districts = await Profile.findAll({
       attributes: ['district'],
       where: {
-        district: { [Op.ne]: null },
-        district: { [Op.ne]: '' }
+        [Op.and]: [
+          { district: { [Op.ne]: null } },
+          { district: { [Op.ne]: '' } }
+        ]
       },
       group: ['district'],
       order: [['district', 'ASC']]
@@ -299,8 +403,10 @@ exports.getNetworkFilterOptions = async (req, res, next) => {
     const castes = await Profile.findAll({
       attributes: ['caste'],
       where: {
-        caste: { [Op.ne]: null },
-        caste: { [Op.ne]: '' }
+        [Op.and]: [
+          { caste: { [Op.ne]: null } },
+          { caste: { [Op.ne]: '' } }
+        ]
       },
       group: ['caste'],
       order: [['caste', 'ASC']]
@@ -310,8 +416,10 @@ exports.getNetworkFilterOptions = async (req, res, next) => {
     const educationDegrees = await EducationDetail.findAll({
       attributes: ['degree'],
       where: {
-        degree: { [Op.ne]: null },
-        degree: { [Op.ne]: '' }
+        [Op.and]: [
+          { degree: { [Op.ne]: null } },
+          { degree: { [Op.ne]: '' } }
+        ]
       },
       group: ['degree'],
       order: [['degree', 'ASC']]
@@ -321,19 +429,24 @@ exports.getNetworkFilterOptions = async (req, res, next) => {
     const companies = await EmploymentDetail.findAll({
       attributes: ['company_name'],
       where: {
-        company_name: { [Op.ne]: null },
-        company_name: { [Op.ne]: '' }
+        [Op.and]: [
+          { company_name: { [Op.ne]: null } },
+          { company_name: { [Op.ne]: '' } }
+        ]
       },
       group: ['company_name'],
       order: [['company_name', 'ASC']]
     });
 
-    res.json({
+    const response = {
       districts: districts.map(d => d.district).filter(Boolean),
       castes: castes.map(c => c.caste).filter(Boolean),
       educationDegrees: educationDegrees.map(e => e.degree).filter(Boolean),
       companies: companies.map(c => c.company_name).filter(Boolean)
-    });
+    };
+
+    console.log('Filter options response:', response);
+    res.json(response);
   } catch (err) {
     console.error('Error in getNetworkFilterOptions:', err);
     next(err);

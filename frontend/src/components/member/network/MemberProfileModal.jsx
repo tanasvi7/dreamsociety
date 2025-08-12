@@ -33,19 +33,19 @@ const MemberProfileModal = ({ member, isOpen, onClose }) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 border-0 shadow-2xl">
-        <DialogHeader className="pb-6">
-          <DialogTitle className="text-2xl font-bold text-gray-900 dark:text-white">
+      <DialogContent className="max-w-[95vw] lg:max-w-6xl max-h-[90vh] overflow-y-auto overflow-x-hidden bg-white dark:bg-slate-900 border-0 shadow-2xl mx-2 sm:mx-4">
+        <DialogHeader className="pb-4 sm:pb-6">
+          <DialogTitle className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 dark:text-white">
             Professional Profile
           </DialogTitle>
         </DialogHeader>
 
         {/* Profile Header */}
-        <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-2xl p-8 mb-8">
-          <div className="flex flex-col lg:flex-row items-start lg:items-center gap-8">
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-2xl p-4 sm:p-6 lg:p-8 mb-6 lg:mb-8">
+          <div className="flex flex-col xl:flex-row items-start xl:items-center gap-6 lg:gap-8">
             {/* Profile Image */}
             <div className="relative">
-              <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 p-2">
+              <div className="w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 p-2">
                 <img
                   src={member.profile?.photo_url || member.avatar || '/placeholder.svg'}
                   alt={member.full_name || member.name}
@@ -62,14 +62,14 @@ const MemberProfileModal = ({ member, isOpen, onClose }) => {
             
             {/* Profile Info */}
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white mb-3">
                 {member.full_name || member.name}
               </h1>
               
               {member.employmentDetails?.[0]?.role && (
                 <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300 mb-2">
                   <Briefcase className="h-5 w-5 text-blue-500" />
-                  <span className="text-lg font-medium">{member.employmentDetails[0].role}</span>
+                  <span className="text-base sm:text-lg font-medium">{member.employmentDetails[0].role}</span>
                   {member.employmentDetails[0].company_name && (
                     <>
                       <span className="text-gray-400">at</span>
@@ -82,7 +82,7 @@ const MemberProfileModal = ({ member, isOpen, onClose }) => {
               {member.profile?.district && (
                 <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300 mb-4">
                   <MapPin className="h-5 w-5 text-green-500" />
-                  <span className="text-lg">
+                  <span className="text-base sm:text-lg">
                     {member.profile.district}
                     {member.profile.mandal && `, ${member.profile.mandal}`}
                     {member.profile.village && `, ${member.profile.village}`}
@@ -106,12 +106,12 @@ const MemberProfileModal = ({ member, isOpen, onClose }) => {
                 )}
               </div>
               
-              <div className="flex gap-3">
-                <Button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base">
                   <User className="h-4 w-4 mr-2" />
                   Connect
                 </Button>
-                <Button variant="outline" className="border-gray-300 text-gray-700 dark:border-gray-600 dark:text-gray-300 px-6 py-3">
+                <Button variant="outline" className="border-gray-300 text-gray-700 dark:border-gray-600 dark:text-gray-300 px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base">
                   <Mail className="h-4 w-4 mr-2" />
                   Message
                 </Button>
@@ -121,14 +121,14 @@ const MemberProfileModal = ({ member, isOpen, onClose }) => {
         </div>
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8">
           
           {/* Left Column */}
           <div className="space-y-8">
             
             {/* Contact Information */}
             <Card className="bg-gray-50/50 dark:bg-slate-800/50 border-0 shadow-lg">
-              <CardContent className="p-6">
+              <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
                     <User className="h-6 w-6 text-blue-600 dark:text-blue-400" />
@@ -201,7 +201,7 @@ const MemberProfileModal = ({ member, isOpen, onClose }) => {
 
             {/* Location Information */}
             <Card className="bg-gray-50/50 dark:bg-slate-800/50 border-0 shadow-lg">
-              <CardContent className="p-6">
+              <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
                     <Home className="h-6 w-6 text-green-600 dark:text-green-400" />
@@ -244,7 +244,7 @@ const MemberProfileModal = ({ member, isOpen, onClose }) => {
             {/* Education Details */}
             {member.educationDetails && member.educationDetails.length > 0 && (
               <Card className="bg-gray-50/50 dark:bg-slate-800/50 border-0 shadow-lg">
-                <CardContent className="p-6">
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
                       <GraduationCap className="h-6 w-6 text-purple-600 dark:text-purple-400" />
@@ -283,7 +283,7 @@ const MemberProfileModal = ({ member, isOpen, onClose }) => {
             {/* Employment Details */}
             {member.employmentDetails && member.employmentDetails.length > 0 && (
               <Card className="bg-gray-50/50 dark:bg-slate-800/50 border-0 shadow-lg">
-                <CardContent className="p-6">
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
                       <BriefcaseIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
@@ -328,15 +328,15 @@ const MemberProfileModal = ({ member, isOpen, onClose }) => {
 
         {/* Family Members */}
         {member.familyMembers && member.familyMembers.length > 0 && (
-          <Card className="mt-8 bg-gray-50/50 dark:bg-slate-800/50 border-0 shadow-lg">
-            <CardContent className="p-6">
+          <Card className="mt-6 lg:mt-8 bg-gray-50/50 dark:bg-slate-800/50 border-0 shadow-lg">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-center gap-3 mb-6">
                 <div className="p-3 bg-pink-100 dark:bg-pink-900/30 rounded-lg">
                   <Users className="h-6 w-6 text-pink-600 dark:text-pink-400" />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Family Members</h3>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {member.familyMembers.map((familyMember, index) => (
                   <div key={index} className="p-4 bg-white dark:bg-slate-700 rounded-lg border-l-4 border-pink-500">
                     <div className="flex items-center gap-2 mb-2">
@@ -366,26 +366,26 @@ const MemberProfileModal = ({ member, isOpen, onClose }) => {
         )}
 
         {/* Network Stats */}
-        <div className="mt-8 p-6 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-2xl">
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Network Statistics</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="mt-6 lg:mt-8 p-4 sm:p-6 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-2xl">
+          <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-4">Network Statistics</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
             <div className="text-center">
-              <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+              <p className="text-2xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400">
                 {member.mutualConnections || Math.floor(Math.random() * 20) + 1}
               </p>
-              <p className="text-sm text-gray-600 dark:text-gray-300">Mutual Connections</p>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">Mutual Connections</p>
             </div>
             <div className="text-center">
-              <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+              <p className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400">
                 {member.educationDetails?.length || 0}
               </p>
-              <p className="text-sm text-gray-600 dark:text-gray-300">Education Records</p>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">Education Records</p>
             </div>
             <div className="text-center">
-              <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+              <p className="text-2xl sm:text-3xl font-bold text-purple-600 dark:text-purple-400">
                 {member.employmentDetails?.length || 0}
               </p>
-              <p className="text-sm text-gray-600 dark:text-gray-300">Employment Records</p>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">Employment Records</p>
             </div>
           </div>
         </div>

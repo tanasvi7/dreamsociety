@@ -17,8 +17,8 @@ async function testValidation() {
     console.log('Are they equal?', testEmail1.toLowerCase().trim() === testEmail2.toLowerCase().trim());
     
     // Test 2: Check if phone normalization works
-    const testPhone1 = ' +91 9876543210 ';
-    const testPhone2 = '+91 9876543210';
+    const testPhone1 = ' 9876543210 ';
+const testPhone2 = '9876543210';
     
     console.log('\nTest 2: Phone normalization');
     console.log('Original phone 1:', `"${testPhone1}"`);

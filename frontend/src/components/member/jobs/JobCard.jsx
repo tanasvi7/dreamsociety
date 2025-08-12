@@ -7,14 +7,17 @@ import {
   Briefcase,
   Bookmark,
   Send,
-  CheckCircle
+  CheckCircle,
+  Lock
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useSubscription } from '../../../hooks/useSubscription';
 import { apiPost } from '../../../services/apiService';
 import useCustomAlert from '../../../hooks/useCustomAlert';
 
 const JobCard = ({ job }) => {
   const { user } = useAuth();
+  const { is_subscribed } = useSubscription();
   const { showAlert } = useCustomAlert();
   const [applying, setApplying] = useState(false);
   const [hasApplied, setHasApplied] = useState(false);
@@ -41,6 +44,11 @@ const JobCard = ({ job }) => {
   const handleApply = async () => {
     if (!user) {
       showAlert('Please login to apply for this job', 'error');
+      return;
+    }
+
+    if (!is_subscribed) {
+      showAlert('Please subscribe to apply for jobs', 'warning');
       return;
     }
 
@@ -146,32 +154,52 @@ const JobCard = ({ job }) => {
                 </button>
                 {/* Show Apply button for accepted jobs that user didn't post */}
                 {job.status === 'accepted' && user && job.posted_by !== user.id && (
-                  <button
-                    onClick={handleApply}
-                    disabled={applying || hasApplied}
-                    className={`px-3 py-1.5 rounded-md text-center font-medium text-sm transition-colors ${
-                      hasApplied 
-                        ? 'bg-green-600 text-white cursor-not-allowed'
-                        : applying
-                        ? 'bg-gray-400 text-white cursor-not-allowed'
-                        : 'bg-green-600 text-white hover:bg-green-700'
-                    }`}
-                  >
-                    {hasApplied ? (
-                      <CheckCircle className="w-4 h-4" />
-                    ) : applying ? (
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    ) : (
-                      'Apply'
-                    )}
-                  </button>
+                  is_subscribed ? (
+                    <button
+                      onClick={handleApply}
+                      disabled={applying || hasApplied}
+                      className={`px-3 py-1.5 rounded-md text-center font-medium text-sm transition-colors ${
+                        hasApplied 
+                          ? 'bg-green-600 text-white cursor-not-allowed'
+                          : applying
+                          ? 'bg-gray-400 text-white cursor-not-allowed'
+                          : 'bg-green-600 text-white hover:bg-green-700'
+                      }`}
+                    >
+                      {hasApplied ? (
+                        <CheckCircle className="w-4 h-4" />
+                      ) : applying ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        'Apply'
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      disabled
+                      className="px-3 py-1.5 rounded-md text-center font-medium text-sm bg-gray-400 text-white cursor-not-allowed flex items-center gap-1"
+                    >
+                      <Lock className="w-3 h-3" />
+                      Subscribe to Apply
+                    </button>
+                  )
                 )}
-                <Link
+                {is_subscribed ? (
+                  <Link
                     to={`/jobs/${job.id}`}
                     className="bg-blue-600 text-white px-4 py-1.5 rounded-md hover:bg-blue-700 transition-colors text-center font-medium text-sm"
-                >
+                  >
                     View
-                </Link>
+                  </Link>
+                ) : (
+                  <button
+                    disabled
+                    className="bg-gray-400 text-white px-4 py-1.5 rounded-md cursor-not-allowed text-center font-medium text-sm flex items-center gap-1"
+                  >
+                    <Lock className="w-3 h-3" />
+                    Subscribe to View
+                  </button>
+                )}
             </div>
         </div>
       </div>

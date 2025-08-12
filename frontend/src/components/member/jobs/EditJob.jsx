@@ -1,7 +1,5 @@
-
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-// import Navbar from '../../common/Navbar';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, 
   MapPin, 
@@ -12,15 +10,19 @@ import {
   Save,
   Eye,
   X,
-  Plus
+  Plus,
+  Loader2
 } from 'lucide-react';
-import { apiPost } from '../../../services/apiService';
+import { apiGet, apiPut } from '../../../services/apiService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../ui/dialog';
 import CustomAlert from '../../common/CustomAlert';
 import useCustomAlert from '../../../hooks/useCustomAlert';
 
-const PostJob = () => {
+const EditJob = () => {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     company: '',
@@ -44,6 +46,60 @@ const PostJob = () => {
   const [errors, setErrors] = useState({});
   const [showPreview, setShowPreview] = useState(false);
   const { alertState, showSuccess, showError, closeAlert } = useCustomAlert();
+
+  // Fetch job data on component mount
+  useEffect(() => {
+    const fetchJob = async () => {
+      try {
+        setLoading(true);
+        const response = await apiGet(`/jobs/${id}`);
+        const job = response.data;
+        
+        // Parse skills from comma-separated string
+        const skillsArray = job.skills_required ? job.skills_required.split(',').map(s => s.trim()) : [];
+        
+        // Parse salary range if it exists
+        let salaryMin = '';
+        let salaryMax = '';
+        if (job.salary_range) {
+          const range = job.salary_range.split('-');
+          if (range.length === 2) {
+            salaryMin = range[0].trim();
+            salaryMax = range[1].trim();
+          }
+        }
+        
+        setFormData({
+          title: job.title || '',
+          company: job.company || '',
+          location: job.location || '',
+          jobType: job.job_type ? job.job_type.charAt(0).toUpperCase() + job.job_type.slice(1) : 'Full-time',
+          workModel: job.work_model || 'office',
+          experience: job.experience_required || '',
+          salary: {
+            min: job.salary_min ? job.salary_min.toString() : salaryMin,
+            max: job.salary_max ? job.salary_max.toString() : salaryMax,
+            currency: job.salary_currency || 'INR'
+          },
+          description: job.description || '',
+          skills: skillsArray,
+          applicationDeadline: job.application_deadline ? job.application_deadline.split('T')[0] : '',
+          contactEmail: job.contact_email || '',
+          companyWebsite: job.company_website || ''
+        });
+      } catch (error) {
+        console.error('Error fetching job:', error);
+        showError('Failed to load job details. Please try again.');
+        navigate('/jobs');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchJob();
+    }
+  }, [id, navigate, showError]);
 
   const handleChange = (field, value) => {
     if (field.includes('.')) {
@@ -107,31 +163,35 @@ const PostJob = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (validateForm()) {
-      // Map frontend fields to backend fields
-      const payload = {
-        title: formData.title,
-        company: formData.company,
-        description: formData.description,
-        skills_required: formData.skills.join(','),
-        job_type: formData.jobType.toLowerCase(),
-        work_model: formData.workModel,
-        experience_required: formData.experience,
-        salary_min: formData.salary.min ? parseFloat(formData.salary.min) : null,
-        salary_max: formData.salary.max ? parseFloat(formData.salary.max) : null,
-        salary_currency: formData.salary.currency,
-        salary_range: formData.salary.min && formData.salary.max ? `${formData.salary.min}-${formData.salary.max}` : '',
-        location: formData.location,
-        application_deadline: formData.applicationDeadline || null,
-        contact_email: formData.contactEmail,
-        company_website: formData.companyWebsite || null,
-        // Optionally add map_lat, map_lng if available
-      };
+      setSaving(true);
       try {
-        await apiPost('/jobs', payload);
-        showSuccess('Job posted successfully!');
+        // Map frontend fields to backend fields
+        const payload = {
+          title: formData.title,
+          company: formData.company,
+          description: formData.description,
+          skills_required: formData.skills.join(','),
+          job_type: formData.jobType.toLowerCase(),
+          work_model: formData.workModel,
+          experience_required: formData.experience,
+          salary_min: formData.salary.min ? parseFloat(formData.salary.min) : null,
+          salary_max: formData.salary.max ? parseFloat(formData.salary.max) : null,
+          salary_currency: formData.salary.currency,
+          salary_range: formData.salary.min && formData.salary.max ? `${formData.salary.min}-${formData.salary.max}` : '',
+          location: formData.location,
+          application_deadline: formData.applicationDeadline || null,
+          contact_email: formData.contactEmail,
+          company_website: formData.companyWebsite || null,
+        };
+        
+        await apiPut(`/jobs/${id}`, payload);
+        showSuccess('Job updated successfully!');
         navigate('/jobs');
       } catch (err) {
-        showError('Failed to post job.');
+        console.error('Error updating job:', err);
+        showError('Failed to update job. Please try again.');
+      } finally {
+        setSaving(false);
       }
     }
   };
@@ -139,6 +199,19 @@ const PostJob = () => {
   const handlePreview = () => {
     setShowPreview(true);
   };
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex items-center justify-center h-64">
+          <div className="flex items-center space-x-2">
+            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+            <span className="text-gray-600">Loading job details...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -154,8 +227,8 @@ const PostJob = () => {
           </Link>
           
           <div className="bg-white rounded-xl shadow-lg p-6">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Post a New Job</h1>
-            <p className="text-gray-600">Find the perfect candidate for your team</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Edit Job Post</h1>
+            <p className="text-gray-600">Update your job posting details</p>
           </div>
         </div>
 
@@ -438,12 +511,22 @@ const PostJob = () => {
               </button>
               
               <div className="flex gap-4">
-                
                 <button
                   type="submit"
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-300"
+                  disabled={saving}
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 >
-                  Post Job
+                  {saving ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-5 h-5 mr-2" />
+                      Update Job
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -512,4 +595,4 @@ const PostJob = () => {
   );
 };
 
-export default PostJob;
+export default EditJob;

@@ -37,7 +37,7 @@ const AdminUserManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
-  const [usersPerPage, setUsersPerPage] = useState(10);
+  const [usersPerPage, setUsersPerPage] = useState(5);
   
   // Replace all individual form states with a single formData state
   const [formData, setFormData] = useState({

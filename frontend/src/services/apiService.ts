@@ -7,7 +7,7 @@ const API_CONFIG = {
   development: 'http://localhost:3000',
   
   // Production URL - Update this to your production backend URL
-  production: 'https://your-production-backend-domain.com'
+  production: 'https://api.dreamssociety.in'
 };
 
 // Get API URL based on environment
@@ -23,16 +23,11 @@ const getApiUrl = () => {
 };
 
 const api = axios.create({
-<<<<<<< HEAD
-  baseURL: 'http://localhost:3000', // HTTP backend URL
-  timeout: 10000, // 10 seconds timeout
-=======
   baseURL: getApiUrl(),
   timeout: 15000, // Increased timeout for production
   headers: {
     'Content-Type': 'application/json',
   },
->>>>>>> 4005cf3262bcc943e25cb00d9a23fb202eabee2f
 });
 
 // Add a request interceptor

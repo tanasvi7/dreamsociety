@@ -2,12 +2,15 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, MapPin, Briefcase, GraduationCap, Building, Eye, UserPlus, Filter, Users, TrendingUp } from 'lucide-react';
+import { Search, MapPin, Briefcase, GraduationCap, Building, Eye, UserPlus, Filter, Users, TrendingUp, Lock, Star } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { networkService } from '../../../services/networkService';
 import MemberProfileModal from './MemberProfileModal';
+import { useSubscription } from '../../../hooks/useSubscription';
+import useCustomAlert from '../../../hooks/useCustomAlert';
+import SubscriptionPrompt from '../../common/SubscriptionPrompt';
 
 const Network = () => {
   const [members, setMembers] = useState([]);
@@ -19,6 +22,8 @@ const Network = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const { is_subscribed, loading: subscriptionLoading } = useSubscription();
+  const { showAlert } = useCustomAlert();
   const [filters, setFilters] = useState({
     district: '',
     experience: '',
@@ -44,6 +49,7 @@ const Network = () => {
       setError(null);
       
       const response = await networkService.getMembers(page, 20, search, sort, currentFilters);
+      
       setMembers(response.members);
       setPagination(response.pagination);
     } catch (err) {
@@ -70,6 +76,7 @@ const Network = () => {
     try {
       setFilterOptionsLoading(true);
       const response = await networkService.getFilterOptions();
+
       setFilterOptions(response);
     } catch (err) {
       console.error('Error fetching filter options:', err);
@@ -124,6 +131,8 @@ const Network = () => {
     setFilters(newFilters);
     // Always trigger search when filter changes (including when cleared)
     setHasSearched(true);
+    // Clear existing members before fetching new ones
+    setMembers([]);
     fetchMembers(1, searchTerm, sortBy, newFilters);
   };
 
@@ -147,6 +156,11 @@ const Network = () => {
   };
 
   const handleViewProfile = async (member) => {
+    if (!is_subscribed) {
+      showAlert('Please subscribe to view member profiles', 'warning');
+      return;
+    }
+
     try {
       setLoading(true);
       // Fetch detailed member information including family details
@@ -161,6 +175,15 @@ const Network = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleConnect = (member) => {
+    if (!is_subscribed) {
+      showAlert('Please subscribe to connect with members', 'warning');
+      return;
+    }
+    // TODO: Implement connect functionality
+    showAlert('Connect feature coming soon!', 'info');
   };
 
   const handleCloseModal = () => {
@@ -189,57 +212,64 @@ const Network = () => {
         </div>
 
         {/* Search and Filter Section */}
-        <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl mb-8">
-          <CardContent className="p-6">
-            <div className="flex flex-col lg:flex-row gap-4 items-center">
-              <div className="relative flex-grow w-full">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+        <Card className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-lg mb-8">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex flex-col gap-4">
+              {/* Search Bar */}
+              <div className="relative w-full">
+                <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
                 <Input 
                   placeholder="Search by name, profession, company, location..." 
-                  className="pl-12 h-12 text-lg border-0 bg-gray-50 dark:bg-slate-700 focus:bg-white dark:focus:bg-slate-600"
+                  className="pl-10 sm:pl-12 h-11 sm:h-12 text-base sm:text-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 focus:border-blue-500 dark:focus:border-blue-400"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                   disabled={loading}
                 />
               </div>
-              <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-                <Select value={sortBy} onValueChange={handleSortChange}>
-                  <SelectTrigger className="w-full sm:w-[180px] h-12 border-0 bg-gray-50 dark:bg-slate-700">
+              
+              {/* Controls Row */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex flex-col sm:flex-row gap-3 flex-1">
+                  <Select value={sortBy} onValueChange={handleSortChange}>
+                    <SelectTrigger className="w-full sm:w-[180px] h-11 sm:h-12 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700">
+                      <Filter className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Sort By" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="recent">Recently Added</SelectItem>
+                      <SelectItem value="name">Name (A-Z)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  <Button 
+                    variant="outline"
+                    className="h-11 sm:h-12 px-4 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-600" 
+                    onClick={() => setShowFilters(!showFilters)}
+                  >
                     <Filter className="h-4 w-4 mr-2" />
-                    <SelectValue placeholder="Sort By" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="recent">Recently Added</SelectItem>
-                    <SelectItem value="name">Name (A-Z)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button 
-                  variant="outline"
-                  className="h-12 px-4 border-gray-300 text-gray-600 hover:bg-gray-50" 
-                  onClick={() => setShowFilters(!showFilters)}
-                >
-                  <Filter className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">
-                    Filters
-                    {Object.values(filters).some(f => f) && (
-                      <span className="ml-1 bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">
-                        {Object.values(filters).filter(f => f).length}
-                      </span>
-                    )}
-                  </span>
-                  <span className="sm:hidden">
-                    Filter
-                    {Object.values(filters).some(f => f) && (
-                      <span className="ml-1 bg-blue-100 text-blue-800 text-xs px-1 py-0.5 rounded-full">
-                        {Object.values(filters).filter(f => f).length}
-                      </span>
-                    )}
-                  </span>
-                </Button>
+                    <span className="hidden sm:inline">
+                      Filters
+                      {Object.values(filters).some(f => f) && (
+                        <span className="ml-1 bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">
+                          {Object.values(filters).filter(f => f).length}
+                        </span>
+                      )}
+                    </span>
+                    <span className="sm:hidden">
+                      Filter
+                      {Object.values(filters).some(f => f) && (
+                        <span className="ml-1 bg-blue-100 text-blue-800 text-xs px-1 py-0.5 rounded-full">
+                          {Object.values(filters).filter(f => f).length}
+                        </span>
+                      )}
+                    </span>
+                  </Button>
+                </div>
+                
                 <div className="flex gap-2">
                   <Button 
-                    className="flex-1 sm:flex-none h-12 px-4 sm:px-8 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold shadow-lg" 
+                    className="flex-1 sm:flex-none h-11 sm:h-12 px-4 sm:px-8 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold shadow-md" 
                     onClick={handleSearch}
                     disabled={loading}
                   >
@@ -259,7 +289,7 @@ const Network = () => {
                   {(searchTerm || Object.values(filters).some(f => f)) && (
                     <Button 
                       variant="outline"
-                      className="h-12 px-3 sm:px-4 border-gray-300 text-gray-600 hover:bg-gray-50" 
+                      className="h-11 sm:h-12 px-3 sm:px-4 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-600" 
                       onClick={() => {
                         setSearchTerm('');
                         handleClearFilters();
@@ -274,83 +304,83 @@ const Network = () => {
                   )}
                 </div>
               </div>
-            </div>
 
-            {/* Advanced Filters */}
-            {showFilters && (
-              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">District</label>
-                    <Select value={filters.district} onValueChange={(value) => handleFilterChange('district', value)}>
-                      <SelectTrigger className="border-gray-300 bg-gray-50 dark:bg-slate-700">
-                        <SelectValue placeholder="Select District" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {filterOptionsLoading ? (
-                          <SelectItem value="loading" disabled>Loading...</SelectItem>
-                        ) : (
-                          filterOptions.districts.map((district) => (
-                            <SelectItem key={district} value={district}>{district}</SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
+              {/* Advanced Filters */}
+              {showFilters && (
+                <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">District</label>
+                      <Select value={filters.district} onValueChange={(value) => handleFilterChange('district', value)}>
+                        <SelectTrigger className="border-gray-300 bg-gray-50 dark:bg-slate-700">
+                          <SelectValue placeholder="Select District" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filterOptionsLoading ? (
+                            <SelectItem value="loading" disabled>Loading...</SelectItem>
+                          ) : (
+                            filterOptions.districts.map((district) => (
+                              <SelectItem key={district} value={district}>{district}</SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Experience (Years)</label>
-                    <Select value={filters.experience} onValueChange={(value) => handleFilterChange('experience', value)}>
-                      <SelectTrigger className="border-gray-300 bg-gray-50 dark:bg-slate-700">
-                        <SelectValue placeholder="Min Experience" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">1+ years</SelectItem>
-                        <SelectItem value="3">3+ years</SelectItem>
-                        <SelectItem value="5">5+ years</SelectItem>
-                        <SelectItem value="10">10+ years</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Experience (Years)</label>
+                      <Select value={filters.experience} onValueChange={(value) => handleFilterChange('experience', value)}>
+                        <SelectTrigger className="border-gray-300 bg-gray-50 dark:bg-slate-700">
+                          <SelectValue placeholder="Min Experience" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">1+ years</SelectItem>
+                          <SelectItem value="3">3+ years</SelectItem>
+                          <SelectItem value="5">5+ years</SelectItem>
+                          <SelectItem value="10">10+ years</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Education</label>
-                    <Select value={filters.education} onValueChange={(value) => handleFilterChange('education', value)}>
-                      <SelectTrigger className="border-gray-300 bg-gray-50 dark:bg-slate-700">
-                        <SelectValue placeholder="Select Education" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {filterOptionsLoading ? (
-                          <SelectItem value="loading" disabled>Loading...</SelectItem>
-                        ) : (
-                          filterOptions.educationDegrees.map((degree) => (
-                            <SelectItem key={degree} value={degree}>{degree}</SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Education</label>
+                      <Select value={filters.education} onValueChange={(value) => handleFilterChange('education', value)}>
+                        <SelectTrigger className="border-gray-300 bg-gray-50 dark:bg-slate-700">
+                          <SelectValue placeholder="Select Education" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filterOptionsLoading ? (
+                            <SelectItem value="loading" disabled>Loading...</SelectItem>
+                          ) : (
+                            filterOptions.educationDegrees.map((degree) => (
+                              <SelectItem key={degree} value={degree}>{degree}</SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Company</label>
-                    <Select value={filters.company} onValueChange={(value) => handleFilterChange('company', value)}>
-                      <SelectTrigger className="border-gray-300 bg-gray-50 dark:bg-slate-700">
-                        <SelectValue placeholder="Select Company" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {filterOptionsLoading ? (
-                          <SelectItem value="loading" disabled>Loading...</SelectItem>
-                        ) : (
-                          filterOptions.companies.map((company) => (
-                            <SelectItem key={company} value={company}>{company}</SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Company</label>
+                      <Select value={filters.company} onValueChange={(value) => handleFilterChange('company', value)}>
+                        <SelectTrigger className="border-gray-300 bg-gray-50 dark:bg-slate-700">
+                          <SelectValue placeholder="Select Company" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filterOptionsLoading ? (
+                            <SelectItem value="loading" disabled>Loading...</SelectItem>
+                          ) : (
+                            filterOptions.companies.map((company) => (
+                              <SelectItem key={company} value={company}>{company}</SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -373,30 +403,48 @@ const Network = () => {
         {/* Members Grid - Only show if hasSearched is true */}
         {hasSearched && (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 mb-8">
+            {/* Subscription Prompt for non-subscribed users */}
+            {!is_subscribed && !subscriptionLoading && (
+              <div className="mb-8">
+                <SubscriptionPrompt 
+                  title="Unlock Network Features"
+                  description="Subscribe to view member profiles and connect with professionals in our community"
+                  features={[
+                    { icon: Users, text: "View detailed profiles" },
+                    { icon: UserPlus, text: "Connect with members" },
+                    { icon: Eye, text: "Access contact information" },
+                    { icon: Star, text: "Premium networking" }
+                  ]}
+                />
+              </div>
+            )}
+
+            <div 
+              key={`members-${JSON.stringify(filters)}-${searchTerm}`}
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6 mb-8"
+            >
               {members.map((member) => (
                 <Card 
                   key={member.id} 
-                  className="group bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm border-0 shadow-md hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 cursor-pointer"
-                  onClick={() => handleViewProfile(member)}
+                  className="group bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden"
                 >
-                  <CardContent className="p-3 sm:p-4">
+                  <CardContent className="p-4 sm:p-5">
                     {/* Profile Header */}
-                    <div className="text-center mb-3 sm:mb-4">
-                      <div className="relative inline-block mb-2 sm:mb-3">
-                        <Avatar className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-blue-200 dark:border-blue-800">
+                    <div className="text-center mb-4">
+                      <div className="relative inline-block mb-3">
+                        <Avatar className="w-16 h-16 sm:w-18 sm:h-18 border-3 border-blue-200 dark:border-blue-800 shadow-md">
                           <AvatarImage src={member.avatar} alt={member.name} />
-                          <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold text-xs sm:text-sm">
+                          <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold text-sm">
                             {getInitials(member.name)}
                           </AvatarFallback>
                         </Avatar>
-                        <div className="absolute -bottom-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 bg-green-400 rounded-full border-2 border-white dark:border-slate-800"></div>
+                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white dark:border-slate-800 shadow-sm"></div>
                       </div>
                       
-                      <h3 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white mb-1 truncate">{member.name}</h3>
+                      <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white mb-1 truncate">{member.name}</h3>
                       
                       {member.title && member.title !== 'Professional' && (
-                        <p className="text-xs text-gray-600 dark:text-gray-300 font-medium mb-1 truncate">{member.title}</p>
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 font-medium mb-1 truncate">{member.title}</p>
                       )}
                       
                       {member.company && (
@@ -405,61 +453,85 @@ const Network = () => {
                     </div>
 
                     {/* Quick Info */}
-                    <div className="space-y-2 mb-3">
+                    <div className="space-y-2 mb-4">
                       {member.education && (
-                        <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
-                          <GraduationCap className="h-3 w-3 text-blue-500" />
+                        <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300">
+                          <GraduationCap className="h-4 w-4 text-blue-500 flex-shrink-0" />
                           <span className="truncate">{member.education}</span>
                         </div>
                       )}
                       
-                      <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
-                        <MapPin className="h-3 w-3 text-green-500" />
+                      <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300">
+                        <MapPin className="h-4 w-4 text-green-500 flex-shrink-0" />
                         <span className="truncate">{member.location}</span>
                       </div>
                     </div>
 
                     {/* Experience */}
                     {member.yearsOfExperience && (
-                      <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                        <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold">{member.yearsOfExperience} years exp.</p>
+                      <div className="mb-4 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
+                        <p className="text-xs sm:text-sm text-blue-600 dark:text-blue-400 font-semibold text-center">{member.yearsOfExperience} years exp.</p>
                       </div>
                     )}
 
                     {/* Badges */}
-                    <div className="flex flex-wrap gap-1 mb-3">
+                    <div className="flex flex-wrap gap-1 mb-4">
                       {member.district && (
-                        <Badge variant="outline" className="border-gray-300 text-gray-600 dark:border-gray-600 dark:text-gray-300 text-xs px-2 py-0.5">
+                        <Badge variant="outline" className="border-gray-300 text-gray-600 dark:border-gray-600 dark:text-gray-300 text-xs px-2 py-1">
                           {member.district}
                         </Badge>
                       )}
                     </div>
 
                     {/* Connections */}
-                    <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-3">
+                    <div className="flex items-center justify-center text-xs text-gray-500 dark:text-gray-400 mb-4">
                       <span>{member.mutualConnections} connections</span>
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex gap-1">
-                      <Button 
-                        className="flex-1 h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleViewProfile(member);
-                        }}
-                      >
-                        <Eye className="h-3 w-3 mr-1" />
-                        View
-                      </Button>
-                      <Button 
-                        className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white text-xs font-medium"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <UserPlus className="h-3 w-3 mr-1" />
-                        Connect
-                      </Button>
-                    </div>
+                                         {/* Action Buttons */}
+                     <div className="flex gap-2">
+                       {is_subscribed ? (
+                         <>
+                           <Button 
+                             className="flex-1 h-9 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium shadow-sm"
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               handleViewProfile(member);
+                             }}
+                           >
+                             <Eye className="h-3 w-3 mr-1" />
+                             <span>View</span>
+                           </Button>
+                           <Button 
+                             className="flex-1 h-9 bg-green-600 hover:bg-green-700 text-white text-xs font-medium shadow-sm"
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               handleConnect(member);
+                             }}
+                           >
+                             <UserPlus className="h-3 w-3 mr-1" />
+                             <span>Connect</span>
+                           </Button>
+                         </>
+                       ) : (
+                         <>
+                           <Button 
+                             className="flex-1 h-9 bg-gray-400 text-white text-xs font-medium cursor-not-allowed shadow-sm"
+                             disabled
+                           >
+                             <Lock className="h-3 w-3 mr-1" />
+                             <span>View</span>
+                           </Button>
+                           <Button 
+                             className="flex-1 h-9 bg-gray-400 text-white text-xs font-medium cursor-not-allowed shadow-sm"
+                             disabled
+                           >
+                             <Lock className="h-3 w-3 mr-1" />
+                             <span>Connect</span>
+                           </Button>
+                         </>
+                       )}
+                     </div>
                   </CardContent>
                 </Card>
               ))}
