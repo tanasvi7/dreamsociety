@@ -83,7 +83,6 @@ sequelize.authenticate()
     
     app.listen(PORT, () => {
       console.log(`HTTP Server running on port ${PORT}`);
-      console.log(`API available at: http://103.127.146.54:${PORT}`);
     });
   })
   .catch((err) => {

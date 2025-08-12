@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -30,6 +31,9 @@ const RegisterScreen = () => {
   const [showTerms, setShowTerms] = useState(false);
   const { register, loading, pendingRegistration } = useAuth();
   const navigate = useNavigate();
+
+  // State to handle the specific loading animation for OTP sending
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
 
   // Redirect to OTP verification if there's already a pending registration
   useEffect(() => {
@@ -198,6 +202,7 @@ const RegisterScreen = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (validateForm()) {
+      setIsSendingOtp(true); // Start the specific OTP sending loading state
       try {
         console.log('Starting registration process...');
         // Prepare payload for backend
@@ -235,6 +240,8 @@ const RegisterScreen = () => {
       } catch (error) {
         console.error('Registration error:', error);
         setErrors({ submit: 'Registration failed. Please try again.' });
+      } finally {
+        setIsSendingOtp(false); // End the specific OTP sending loading state
       }
     }
   };
@@ -594,14 +601,14 @@ const RegisterScreen = () => {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || isSendingOtp}
                 className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-4 rounded-xl font-semibold hover:from-blue-700 hover:to-cyan-600 hover:scale-105 transition-all duration-300 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
                 style={{fontFamily: 'Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
               >
-                {loading ? (
+                {isSendingOtp ? (
                   <div className="flex items-center space-x-2">
                     <Loader className="w-5 h-5 animate-spin" />
-                    <span>Creating Account...</span>
+                    <span>Sending OTP...</span>
                   </div>
                 ) : (
                   'Create Account'
@@ -624,21 +631,24 @@ const RegisterScreen = () => {
             {/* Links */}
             <div className="mt-6 text-center">
               <div className="text-gray-600" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
-                Already have an account?{' '}
-                <Link to="/login" className="text-blue-600 hover:text-blue-700 font-semibold transition-colors">
-                  Sign in
+                Already have a account?
+                <Link to="/login" className="text-blue-600 hover:text-blue-700 font-semibold ml-1">
+                  Login
                 </Link>
               </div>
             </div>
           </div>
+
+          {/* Back button */}
+          <Link to="/" className="absolute top-4 left-4 inline-flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors">
+            <ArrowLeft className="h-5 w-5" />
+            <span className="font-medium">Back to Home</span>
+          </Link>
         </div>
       </div>
 
       {/* Terms and Conditions Modal */}
-      <TermsAndConditions 
-        isOpen={showTerms} 
-        onClose={() => setShowTerms(false)} 
-      />
+      {showTerms && <TermsAndConditions onClose={() => setShowTerms(false)} />}
     </div>
   );
 };

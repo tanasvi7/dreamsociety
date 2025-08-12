@@ -1,18 +1,14 @@
-
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useProfilePhoto } from '../../hooks/useProfilePhoto';
-import ProfilePhoto from './ProfilePhoto';
 import ProfileImage from './ProfileImage';
 import GlobalSearch from './GlobalSearch';
 import { 
-  Bell, 
   Search, 
   Menu, 
   X, 
   User, 
-  Settings, 
   LogOut, 
   Briefcase,
   Users,
@@ -40,148 +36,201 @@ const Navbar = () => {
     { name: 'Profile', href: '/profile', icon: User }
   ];
 
+  // Helper function to get link classes
+  const getLinkClasses = (isActive) => {
+    return `relative px-4 py-2 rounded-md text-sm font-medium transition-colors group ${
+      isActive 
+        ? 'text-indigo-600 bg-indigo-50' 
+        : 'text-gray-600 hover:text-indigo-600'
+    }`;
+  };
+
+  // Helper function to get mobile link classes
+  const getMobileLinkClasses = (isActive) => {
+    return `flex items-center px-3 py-3 text-sm font-medium rounded-md transition-colors ${
+      isActive
+        ? 'text-indigo-600 bg-indigo-50'
+        : 'text-gray-700 hover:text-indigo-600 hover:bg-indigo-50'
+    }`;
+  };
+
+  // Helper function to get dropdown link classes
+  const getDropdownLinkClasses = (isActive) => {
+    return `flex items-center px-4 py-2.5 text-sm transition-colors ${
+      isActive 
+        ? 'bg-indigo-50 text-indigo-700' 
+        : 'text-gray-700 hover:bg-indigo-50 hover:text-indigo-700'
+    }`;
+  };
+
   return (
     <>
       <GlobalSearch 
         isOpen={searchOpen}
         onClose={() => setSearchOpen(false)}
       />
-      <nav className="bg-white shadow-lg sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <Link to="/dashboard" className="flex items-center space-x-2">
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center px-2 py-2">
-              <span className="text-white font-bold text-sm">DREAMS</span>
-            </div>
-            <span className="text-xl font-bold text-gray-900 hidden sm:block">UNITY</span>
-          </Link>
-
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
-            {navigationItems.map((item) => (
-              <Link
-                key={item.name}
-                to={item.href}
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-              >
-                {item.name}
-              </Link>
-            ))}
-          </div>
-
-          {/* Right Side */}
-          <div className="flex items-center space-x-4">
-            {/* Global Search */}
-            <button 
-              onClick={() => setSearchOpen(true)}
-              className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-              title="Global Search"
-            >
-              <Search className="h-6 w-6" />
-            </button>
-
-            {/* Notifications */}
-            <NotificationBell />
-
-            {/* Profile Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className="flex items-center space-x-2 p-2 rounded-full hover:bg-gray-100 transition-colors"
-              >
-                <ProfileImage
-                  photoUrl={photoUrl}
-                  size="sm"
-                  loading={loading}
-                  alt={user?.full_name || user?.name || 'Profile'}
-                />
-                <span className="hidden sm:block text-sm font-medium text-gray-700">
-                  {user?.full_name || user?.name}
-                </span>
-              </button>
-
-              {/* Dropdown Menu */}
-              {isProfileOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-50">
-                  <Link
-                    to="/profile"
-                    className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    onClick={() => setIsProfileOpen(false)}
-                  >
-                    <User className="h-4 w-4 mr-3" />
-                    View Profile
-                  </Link>
-                  <Link
-                    to="/membership"
-                    className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    onClick={() => setIsProfileOpen(false)}
-                  >
-                    <CreditCard className="h-4 w-4 mr-3" />
-                    Subscription
-                  </Link>
-                  <hr className="my-2" />
-                  <button
-                    onClick={handleLogout}
-                    className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
-                  >
-                    <LogOut className="h-4 w-4 mr-3" />
-                    Sign Out
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Mobile Menu Button */}
-            <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="md:hidden p-2 text-gray-600 hover:text-blue-600 transition-colors"
-            >
-              {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile Menu */}
-        {isMenuOpen && (
-          <div className="md:hidden border-t border-gray-200">
-            <div className="px-2 pt-2 pb-3 space-y-1">
-              {/* Search on Mobile */}
-              <div className="px-3 py-2">
-                <button
-                  onClick={() => {
-                    setSearchOpen(true);
-                    setIsMenuOpen(false);
-                  }}
-                  className="w-full relative"
-                >
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Search className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="text"
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Search..."
-                    readOnly
-                  />
-                </button>
+      <nav className="bg-white shadow-sm sticky top-0 z-50 border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* Logo */}
+            <Link to="/dashboard" className="flex items-center space-x-2 group">
+              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center px-3 py-2 shadow-md group-hover:shadow-lg transition-all">
+                <span className="text-white font-bold text-sm tracking-wider">DREAMS</span>
               </div>
-              
-              {/* Navigation Items */}
+              <span className="text-xl font-bold text-gray-900 hidden sm:block bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                UNITY
+              </span>
+            </Link>
+
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center space-x-1">
               {navigationItems.map((item) => (
-                <Link
+                <NavLink
                   key={item.name}
                   to={item.href}
-                  className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-md"
-                  onClick={() => setIsMenuOpen(false)}
+                  className={({ isActive }) => getLinkClasses(isActive)}
+                  end={item.href === '/dashboard'}
                 >
-                  {item.name}
-                </Link>
+                  {({ isActive }) => (
+                    <>
+                      {item.name}
+                      <span className={`absolute bottom-0 left-1/2 transform -translate-x-1/2 h-0.5 transition-all duration-300 ${
+                        isActive ? 'w-3/4 bg-indigo-600' : 'w-0 bg-indigo-600 group-hover:w-3/4'
+                      }`}></span>
+                    </>
+                  )}
+                </NavLink>
               ))}
             </div>
+
+            {/* Right Side */}
+            <div className="flex items-center space-x-2">
+              {/* Global Search */}
+              <button 
+                onClick={() => setSearchOpen(true)}
+                className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
+                title="Global Search"
+              >
+                <Search className="h-5 w-5" />
+              </button>
+
+              {/* Notifications */}
+              <NotificationBell />
+
+              {/* Profile Dropdown */}
+              <div className="relative ml-2">
+                <button
+                  onClick={() => setIsProfileOpen(!isProfileOpen)}
+                  className="flex items-center space-x-2 p-1 rounded-full hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-200"
+                >
+                  <ProfileImage
+                    photoUrl={photoUrl}
+                    size="sm"
+                    loading={loading}
+                    alt={user?.full_name || user?.name || 'Profile'}
+                    className="ring-2 ring-indigo-100"
+                  />
+                  <span className="hidden sm:block text-sm font-medium text-gray-700">
+                    {user?.full_name || user?.name}
+                  </span>
+                </button>
+
+                {/* Dropdown Menu */}
+                {isProfileOpen && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl py-1 z-50 border border-gray-100">
+                    <div className="px-4 py-3 border-b border-gray-100">
+                      <p className="text-sm font-medium text-gray-900">{user?.full_name || user?.name}</p>
+                      <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                    </div>
+                    <NavLink
+                      to="/profile"
+                      className={({ isActive }) => getDropdownLinkClasses(isActive)}
+                      onClick={() => setIsProfileOpen(false)}
+                    >
+                      <User className="h-4 w-4 mr-3 text-gray-500" />
+                      View Profile
+                    </NavLink>
+                    <NavLink
+                      to="/membership"
+                      className={({ isActive }) => getDropdownLinkClasses(isActive)}
+                      onClick={() => setIsProfileOpen(false)}
+                    >
+                      <CreditCard className="h-4 w-4 mr-3 text-gray-500" />
+                      Subscription
+                    </NavLink>
+                    <hr className="my-1 border-gray-100" />
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <LogOut className="h-4 w-4 mr-3" />
+                      Sign Out
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Mobile Menu Button */}
+              <button
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="md:hidden p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
+              >
+                {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+
+          {/* Mobile Menu */}
+          {isMenuOpen && (
+            <div className="md:hidden border-t border-gray-100 bg-white">
+              <div className="px-2 pt-2 pb-3 space-y-1">
+                {/* Search on Mobile */}
+                <div className="px-2 py-1">
+                  <button
+                    onClick={() => {
+                      setSearchOpen(true);
+                      setIsMenuOpen(false);
+                    }}
+                    className="w-full relative"
+                  >
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Search className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      type="text"
+                      className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-full focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 text-sm"
+                      placeholder="Search..."
+                      readOnly
+                    />
+                  </button>
+                </div>
+                
+                {/* Navigation Items */}
+                {navigationItems.map((item) => (
+                  <NavLink
+                    key={item.name}
+                    to={item.href}
+                    className={({ isActive }) => getMobileLinkClasses(isActive)}
+                    onClick={() => setIsMenuOpen(false)}
+                    end={item.href === '/dashboard'}
+                  >
+                    {item.icon && <item.icon className="h-4 w-4 mr-3 text-gray-400" />}
+                    {item.name}
+                  </NavLink>
+                ))}
+              </div>
+              <div className="px-4 py-3 border-t border-gray-100">
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </nav>
     </>
   );
