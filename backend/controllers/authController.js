@@ -8,6 +8,22 @@ const { Op } = require('sequelize');
 // Temporary storage for pending registrations (in production, use Redis or database)
 const pendingRegistrations = new Map();
 
+// Add this function at the top of the file
+const cleanupExpiredRegistrations = () => {
+  const now = Date.now();
+  const tenMinutes = 10 * 60 * 1000;
+  
+  for (const [email, data] of pendingRegistrations.entries()) {
+    if (now - data.timestamp > tenMinutes) {
+      pendingRegistrations.delete(email);
+      console.log(`Cleaned up expired registration for: ${email}`);
+    }
+  }
+};
+
+// Run cleanup every 5 minutes
+setInterval(cleanupExpiredRegistrations, 5 * 60 * 1000);
+
 // Check email/phone availability endpoint
 exports.checkAvailability = async (req, res, next) => {
   try {
@@ -96,10 +112,23 @@ exports.register = async (req, res, next) => {
       throw new ValidationError('Phone number is already registered. Please try a different phone number.');
     }
     
+    // Clean up expired registrations first
+    cleanupExpiredRegistrations();
+    
     // Check if there's a pending registration
     if (pendingRegistrations.has(normalizedEmail)) {
-      console.log('❌ VALIDATION FAILED: Registration already in progress for this email');
-      throw new ValidationError('Registration already in progress for this email');
+      const registrationData = pendingRegistrations.get(normalizedEmail);
+      const timeSinceRegistration = Date.now() - registrationData.timestamp;
+      const tenMinutes = 10 * 60 * 1000;
+      
+      if (timeSinceRegistration > tenMinutes) {
+        // Remove expired registration
+        pendingRegistrations.delete(normalizedEmail);
+        console.log('Removed expired registration for:', normalizedEmail);
+      } else {
+        console.log('❌ VALIDATION FAILED: Registration already in progress for this email');
+        throw new ValidationError('Registration already in progress for this email. Please check your email for OTP or wait a few minutes before trying again.');
+      }
     }
     
     console.log('✅ VALIDATION PASSED: No existing user found in database, proceeding with registration...');
