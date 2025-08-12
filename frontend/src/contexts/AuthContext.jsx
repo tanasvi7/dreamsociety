@@ -13,6 +13,91 @@ export const useAuth = () => {
   return context;
 };
 
+// Enhanced error handling utility
+const handleApiError = (error, operation = 'operation') => {
+  console.error(`${operation} error:`, error);
+  
+  let errorMessage = `${operation} failed. Please try again.`;
+  let errorType = 'general';
+  
+  if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
+    errorMessage = 'No internet connection. Please check your network and try again.';
+    errorType = 'network';
+  } else if (error.code === 'ECONNABORTED') {
+    errorMessage = 'Request timed out. Please try again.';
+    errorType = 'timeout';
+  } else if (error.response) {
+    const status = error.response.status;
+    const errorData = error.response.data;
+    
+    switch (status) {
+      case 400:
+        errorMessage = errorData?.error || errorData?.message || 'Invalid request. Please check your input.';
+        errorType = 'validation';
+        break;
+      case 401:
+        errorMessage = 'Authentication failed. Please try again.';
+        errorType = 'authentication';
+        break;
+      case 403:
+        errorMessage = 'Access denied. Your account may be suspended.';
+        errorType = 'access_denied';
+        break;
+      case 404:
+        errorMessage = 'Service not found. Please try again later.';
+        errorType = 'service_not_found';
+        break;
+      case 429:
+        errorMessage = 'Too many requests. Please wait before trying again.';
+        errorType = 'rate_limit';
+        break;
+      case 500:
+        errorMessage = 'Server error. Please try again later.';
+        errorType = 'server_error';
+        break;
+      case 502:
+      case 503:
+      case 504:
+        errorMessage = 'Service temporarily unavailable. Please try again later.';
+        errorType = 'service_unavailable';
+        break;
+      default:
+        errorMessage = errorData?.error || errorData?.message || 'An unexpected error occurred.';
+        errorType = 'unknown';
+    }
+  } else if (error.request) {
+    errorMessage = 'No response from server. Please check your connection.';
+    errorType = 'no_response';
+  } else {
+    errorMessage = error.message || 'An unexpected error occurred.';
+    errorType = 'unknown';
+  }
+  
+  return { 
+    success: false, 
+    error: errorMessage,
+    type: errorType
+  };
+};
+
+// Retry utility function
+const retryOperation = async (operation, maxRetries = 3, delay = 1000) => {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      console.error(`Attempt ${attempt + 1} failed:`, error);
+      
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      
+      // Wait before retrying (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, attempt)));
+    }
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -104,16 +189,14 @@ export const AuthProvider = ({ children }) => {
     console.log('AuthContext: User state changed:', user ? { id: user.id, role: user.role } : null);
   }, [user]);
 
-  // Don't automatically load profile photo when user changes
-  // Profile photo will be loaded explicitly when needed (e.g., on dashboard)
-
   const login = async (credentials) => {
     try {
       console.log('AuthContext: Attempting login with credentials:', credentials);
       
-      // Add timeout to the request
-      const response = await api.post('/auth/login', credentials, {
-        timeout: 10000 // 10 seconds timeout
+      const response = await retryOperation(async () => {
+        return await api.post('/auth/login', credentials, {
+          timeout: 15000 // 15 seconds timeout
+        });
       });
       
       console.log('AuthContext: Login response:', response.data);
@@ -130,63 +213,69 @@ export const AuthProvider = ({ children }) => {
       
       return { success: true, user: userData };
     } catch (error) {
-      console.error('Login error:', error);
+      return handleApiError(error, 'Login');
+    }
+  };
+
+  const register = async (userData) => {
+    try {
+      console.log('AuthContext: Starting registration process');
       
-      // Enhanced error handling
-      let errorMessage = 'Login failed. Please try again.';
+      const response = await retryOperation(async () => {
+        return await api.post('/auth/register', userData, {
+          timeout: 20000 // 20 seconds timeout for registration
+        });
+      });
+      
+      console.log('AuthContext: Registration response:', response.data);
+      
+      // Registration is successful but user is not created yet
+      // Store email for OTP verification
+      localStorage.setItem('pendingRegistrationEmail', userData.email);
+      
+      // Store registration timestamp for session management
+      localStorage.setItem('registrationTimestamp', Date.now().toString());
+      
+      return { 
+        success: true, 
+        message: response.data.message,
+        email: response.data.email
+      };
+    } catch (error) {
+      console.error('Registration error:', error);
+      
+      // Clear pending registration on error
+      localStorage.removeItem('pendingRegistrationEmail');
+      localStorage.removeItem('registrationTimestamp');
+      
+      // Handle specific backend error messages
+      let errorMessage = 'Registration failed. Please try again.';
       let errorType = 'general';
       
-      if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
-        errorMessage = 'No internet connection. Please check your network and try again.';
-        errorType = 'network';
-      } else if (error.code === 'ECONNABORTED') {
-        errorMessage = 'Request timed out. Please try again.';
-        errorType = 'timeout';
-      } else if (error.response) {
-        const status = error.response.status;
-        const errorData = error.response.data;
+      if (error.response?.data?.message) {
+        const backendMessage = error.response.data.message;
         
-        switch (status) {
-          case 400:
-            errorMessage = errorData?.error || 'Invalid email or password.';
-            errorType = 'validation';
-            break;
-          case 401:
-            errorMessage = 'Invalid email or password. Please check your credentials.';
-            errorType = 'credentials';
-            break;
-          case 403:
-            errorMessage = 'Access denied. Your account may be suspended.';
-            errorType = 'access_denied';
-            break;
-          case 404:
-            errorMessage = 'Login service not found. Please try again later.';
-            errorType = 'service_not_found';
-            break;
-          case 429:
-            errorMessage = 'Too many login attempts. Please wait before trying again.';
-            errorType = 'rate_limit';
-            break;
-          case 500:
-            errorMessage = 'Server error. Please try again later.';
-            errorType = 'server_error';
-            break;
-          case 502:
-          case 503:
-          case 504:
-            errorMessage = 'Service temporarily unavailable. Please try again later.';
-            errorType = 'service_unavailable';
-            break;
-          default:
-            errorMessage = errorData?.error || 'An unexpected error occurred.';
-            errorType = 'unknown';
+        // Map backend error messages to user-friendly messages
+        if (backendMessage.includes('Email address is already registered')) {
+          errorMessage = 'Email address is already registered. Please try a different email address.';
+          errorType = 'email_exists';
+        } else if (backendMessage.includes('Phone number is already registered')) {
+          errorMessage = 'Phone number is already registered. Please try a different phone number.';
+          errorType = 'phone_exists';
+        } else if (backendMessage.includes('Email and phone number are already registered')) {
+          errorMessage = 'Email and phone number are already registered. Please use different credentials.';
+          errorType = 'both_exist';
+        } else if (backendMessage.includes('Registration already in progress')) {
+          errorMessage = 'Registration already in progress for this email. Please check your email for OTP or try again in a few minutes.';
+          errorType = 'registration_in_progress';
+        } else {
+          errorMessage = backendMessage;
         }
-      } else if (error.request) {
-        errorMessage = 'No response from server. Please check your connection.';
-        errorType = 'no_response';
       } else {
-        errorMessage = error.message || 'An unexpected error occurred.';
-        errorType = 'unknown';
+        // Use generic error handling for network/technical issues
+        const genericError = handleApiError(error, 'Registration');
+        errorMessage = genericError.error;
+        errorType = genericError.type;
       }
       
       return { 
@@ -197,55 +286,34 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (userData) => {
-    try {
-      console.log('AuthContext: Starting registration process');
-      const response = await api.post('/auth/register', userData);
-      console.log('AuthContext: Registration response:', response.data);
-      
-      // Registration is successful but user is not created yet
-      // Store email for OTP verification
-      localStorage.setItem('pendingRegistrationEmail', userData.email);
-      
-      return { 
-        success: true, 
-        message: response.data.message,
-        email: response.data.email
-      };
-    } catch (error) {
-      console.error('Registration error:', error);
-      
-      // Handle specific backend error messages
-      let errorMessage = 'Registration failed. Please try again.';
-      
-      if (error.response?.data?.message) {
-        const backendMessage = error.response.data.message;
-        
-        // Map backend error messages to user-friendly messages
-        if (backendMessage.includes('Email address is already registered')) {
-          errorMessage = 'Email address is already registered. Please try a different email address.';
-        } else if (backendMessage.includes('Phone number is already registered')) {
-          errorMessage = 'Phone number is already registered. Please try a different phone number.';
-        } else if (backendMessage.includes('Email and phone number are already registered')) {
-          errorMessage = 'Email and phone number are already registered. Please use different credentials.';
-        } else if (backendMessage.includes('Registration already in progress')) {
-          errorMessage = 'Registration already in progress for this email. Please check your email for OTP or try again later.';
-        } else {
-          errorMessage = backendMessage;
-        }
-      }
-      
-      return { 
-        success: false, 
-        error: errorMessage
-      };
-    }
-  };
-
   const verifyOtp = async (otpData) => {
     try {
       console.log('AuthContext: Starting OTP verification');
-      const response = await api.post('/auth/verify-otp', otpData);
+      
+      // Check if registration session is still valid (30 minutes)
+      const registrationTimestamp = localStorage.getItem('registrationTimestamp');
+      if (registrationTimestamp) {
+        const sessionAge = Date.now() - parseInt(registrationTimestamp);
+        const maxSessionAge = 30 * 60 * 1000; // 30 minutes
+        
+        if (sessionAge > maxSessionAge) {
+          // Clear expired session
+          localStorage.removeItem('pendingRegistrationEmail');
+          localStorage.removeItem('registrationTimestamp');
+          return {
+            success: false,
+            error: 'Registration session expired. Please start registration again.',
+            type: 'session_expired'
+          };
+        }
+      }
+      
+      const response = await retryOperation(async () => {
+        return await api.post('/auth/verify-otp', otpData, {
+          timeout: 15000 // 15 seconds timeout
+        });
+      });
+      
       console.log('AuthContext: OTP verification response:', response.data);
       
       const { token, user: newUser } = response.data;
@@ -254,8 +322,9 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('token', token);
       setUser(newUser);
       
-      // Clear pending registration
+      // Clear pending registration data
       localStorage.removeItem('pendingRegistrationEmail');
+      localStorage.removeItem('registrationTimestamp');
       
       return { 
         success: true, 
@@ -264,17 +333,61 @@ export const AuthProvider = ({ children }) => {
       };
     } catch (error) {
       console.error('OTP verification error:', error);
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'OTP verification failed' 
-      };
+      
+      // Handle specific OTP errors
+      if (error.response?.data?.message) {
+        const backendMessage = error.response.data.message;
+        
+        if (backendMessage.includes('OTP not found') || backendMessage.includes('expired')) {
+          return {
+            success: false,
+            error: 'OTP has expired. Please request a new one.',
+            type: 'otp_expired'
+          };
+        } else if (backendMessage.includes('Invalid OTP')) {
+          return {
+            success: false,
+            error: 'Invalid OTP. Please check and try again.',
+            type: 'invalid_otp'
+          };
+        } else if (backendMessage.includes('Maximum verification attempts exceeded')) {
+          return {
+            success: false,
+            error: 'Too many failed attempts. Please request a new OTP.',
+            type: 'max_attempts_exceeded'
+          };
+        } else {
+          return {
+            success: false,
+            error: backendMessage,
+            type: 'otp_error'
+          };
+        }
+      }
+      
+      // Handle network and other errors
+      if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
+        return {
+          success: false,
+          error: 'Network error. Please check your connection and try again.',
+          type: 'network_error'
+        };
+      }
+      
+      return handleApiError(error, 'OTP verification');
     }
   };
 
   const resendOtp = async (email) => {
     try {
       console.log('AuthContext: Resending OTP');
-      const response = await api.post('/auth/resend-otp', { email });
+      
+      const response = await retryOperation(async () => {
+        return await api.post('/auth/resend-otp', { email }, {
+          timeout: 15000 // 15 seconds timeout
+        });
+      });
+      
       console.log('AuthContext: Resend OTP response:', response.data);
       
       return { 
@@ -283,15 +396,55 @@ export const AuthProvider = ({ children }) => {
       };
     } catch (error) {
       console.error('Resend OTP error:', error);
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Failed to resend OTP' 
-      };
+      
+      // Handle specific resend errors
+      if (error.response?.data?.message) {
+        const backendMessage = error.response.data.message;
+        
+        if (backendMessage.includes('No pending registration')) {
+          return {
+            success: false,
+            error: 'No pending registration found. Please start registration again.',
+            type: 'no_pending_registration'
+          };
+        } else if (backendMessage.includes('session expired')) {
+          return {
+            success: false,
+            error: 'Registration session expired. Please register again.',
+            type: 'session_expired'
+          };
+        } else if (backendMessage.includes('Maximum verification attempts exceeded')) {
+          return {
+            success: false,
+            error: 'Too many failed attempts. Please request a new OTP.',
+            type: 'max_attempts_exceeded'
+          };
+        } else {
+          return {
+            success: false,
+            error: backendMessage,
+            type: 'resend_error'
+          };
+        }
+      }
+      
+      // Handle network errors
+      if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
+        return {
+          success: false,
+          error: 'Network error. Please check your connection and try again.',
+          type: 'network_error'
+        };
+      }
+      
+      return handleApiError(error, 'Resend OTP');
     }
   };
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('pendingRegistrationEmail');
+    localStorage.removeItem('registrationTimestamp');
     setUser(null);
     setProfilePhoto({ url: null, loading: false, error: null, lastLoaded: null });
   };

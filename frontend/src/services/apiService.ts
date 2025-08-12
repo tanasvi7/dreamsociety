@@ -1,9 +1,38 @@
 // apiService.ts
 import axios from 'axios';
 
+// API Configuration - Update this URL for production
+const API_CONFIG = {
+  // Development URL (localhost)
+  development: 'http://localhost:3000',
+  
+  // Production URL - Update this to your production backend URL
+  production: 'https://your-production-backend-domain.com'
+};
+
+// Get API URL based on environment
+const getApiUrl = () => {
+  // For development, always use localhost
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return API_CONFIG.development;
+  }
+  
+  // For production, use production URL
+  // Update the production URL above to your actual backend domain
+  return API_CONFIG.production;
+};
+
 const api = axios.create({
+<<<<<<< HEAD
   baseURL: 'http://localhost:3000', // HTTP backend URL
   timeout: 10000, // 10 seconds timeout
+=======
+  baseURL: getApiUrl(),
+  timeout: 15000, // Increased timeout for production
+  headers: {
+    'Content-Type': 'application/json',
+  },
+>>>>>>> 4005cf3262bcc943e25cb00d9a23fb202eabee2f
 });
 
 // Add a request interceptor
@@ -11,6 +40,7 @@ api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     console.log('API Request:', config.method?.toUpperCase(), config.url);
+    console.log('API Base URL:', getApiUrl());
     console.log('Token available:', !!token);
     console.log('Token value:', token ? token.substring(0, 20) + '...' : 'null');
     if (token) {
@@ -59,18 +89,27 @@ api.interceptors.response.use(
   }
 );
 
-// Check availability function
-export const checkAvailability = async (email?: string, phone?: string) => {
-  try {
-    const params = new URLSearchParams();
-    if (email) params.append('email', email);
-    if (phone) params.append('phone', phone);
-    
-    const response = await api.get(`/auth/check-availability?${params.toString()}`);
-    return response.data;
-  } catch (error) {
-    console.error('Availability check error:', error);
-    throw error;
+// Check availability function with retry logic
+export const checkAvailability = async (email?: string, phone?: string, retries = 2) => {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const params = new URLSearchParams();
+      if (email) params.append('email', email);
+      if (phone) params.append('phone', phone);
+      
+      const response = await api.get(`/auth/check-availability?${params.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Availability check error (attempt ${attempt + 1}):`, error);
+      
+      // If this is the last attempt, throw the error
+      if (attempt === retries) {
+        throw error;
+      }
+      
+      // Wait before retrying (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+    }
   }
 };
 

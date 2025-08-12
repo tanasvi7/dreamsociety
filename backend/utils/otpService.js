@@ -176,33 +176,50 @@ const sendOTP = async (email) => {
 const verifyOTP = async (email, otp) => {
   try {
     const otpData = otpStore.get(email);
+    
+    // Check if OTP exists
     if (!otpData) {
       throw new Error('OTP not found or expired');
     }
+    
+    // Check if OTP has expired
     if (Date.now() > otpData.expiresAt) {
       otpStore.delete(email);
       throw new Error('OTP has expired');
     }
+    
+    // Check if maximum attempts already exceeded
     if (otpData.attempts >= OTP_CONFIG.MAX_ATTEMPTS) {
-      otpStore.delete(email);
-      throw new Error('Maximum verification attempts exceeded');
+      // Don't delete immediately, let user know they need to request new OTP
+      throw new Error('Maximum verification attempts exceeded. Please request a new OTP.');
     }
+    
+    // Increment attempts first
     otpData.attempts++;
+    
+    // Check if OTP is correct
     if (otpData.otp === otp) {
+      // Success - delete OTP and return success
       otpStore.delete(email);
       return {
         success: true,
         message: 'OTP verified successfully'
       };
     } else {
-      if (otpData.attempts >= OTP_CONFIG.MAX_ATTEMPTS) {
+      // Invalid OTP
+      const remainingAttempts = OTP_CONFIG.MAX_ATTEMPTS - otpData.attempts;
+      
+      if (remainingAttempts <= 0) {
+        // Max attempts reached - delete OTP and throw error
         otpStore.delete(email);
-        throw new Error('Maximum verification attempts exceeded');
+        throw new Error('Maximum verification attempts exceeded. Please request a new OTP.');
+      } else {
+        // Still have attempts left
+        return {
+          success: false,
+          message: `Invalid OTP. ${remainingAttempts} attempts remaining`
+        };
       }
-      return {
-        success: false,
-        message: `Invalid OTP. ${OTP_CONFIG.MAX_ATTEMPTS - otpData.attempts} attempts remaining`
-      };
     }
   } catch (error) {
     console.error('[OTP SERVICE] Error verifying OTP:', error);
@@ -212,7 +229,24 @@ const verifyOTP = async (email, otp) => {
 
 const resendOTP = async (email) => {
   try {
-    otpStore.delete(email);
+    // Check if there's an existing OTP
+    const existingOtpData = otpStore.get(email);
+    
+    if (existingOtpData) {
+      // If OTP exists but max attempts exceeded, delete it and send new one
+      if (existingOtpData.attempts >= OTP_CONFIG.MAX_ATTEMPTS) {
+        console.log(`[OTP SERVICE] Max attempts exceeded for ${email}, deleting old OTP and sending new one`);
+        otpStore.delete(email);
+      } else {
+        // If OTP exists and attempts not exceeded, just delete and send new one
+        console.log(`[OTP SERVICE] Resending OTP for ${email}`);
+        otpStore.delete(email);
+      }
+    } else {
+      console.log(`[OTP SERVICE] No existing OTP found for ${email}, sending new OTP`);
+    }
+    
+    // Send new OTP
     return await sendOTP(email);
   } catch (error) {
     console.error('[OTP SERVICE] Error resending OTP:', error);

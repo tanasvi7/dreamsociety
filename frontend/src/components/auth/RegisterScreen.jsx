@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft, Loader } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft, Loader, AlertCircle, CheckCircle } from 'lucide-react';
 import Captcha from '../common/Captcha';
 import TermsAndConditions from '../common/TermsAndConditions';
 import { apiPost, checkAvailability } from '../../services/apiService';
@@ -29,6 +29,7 @@ const RegisterScreen = () => {
     phone: { available: true, checking: false }
   });
   const [showTerms, setShowTerms] = useState(false);
+  const [submitAttempts, setSubmitAttempts] = useState(0);
   const { register, loading, pendingRegistration } = useAuth();
   const navigate = useNavigate();
 
@@ -148,49 +149,58 @@ const RegisterScreen = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    
-    if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
+
+    // Name validation
+    if (!formData.name) {
+      newErrors.name = 'Full name is required';
+    } else if (formData.name.length < 2) {
+      newErrors.name = 'Full name must be at least 2 characters';
+    } else if (formData.name.length > 50) {
+      newErrors.name = 'Full name must be less than 50 characters';
     }
-    
+
+    // Email validation
     if (!formData.email) {
-      newErrors.email = 'Email is required';
+      newErrors.email = 'Email address is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid';
-    } else if (!availabilityStatus.email.available) {
-      console.log('❌ Form validation: Email already exists in database');
+      newErrors.email = 'Please enter a valid email address';
+    } else if (formData.email && !availabilityStatus.email.checking && !availabilityStatus.email.available) {
       newErrors.email = 'Email address is already registered. Please try a different email address.';
-    } else {
-      console.log('✅ Form validation: Email is available in database');
     }
-    
+
+    // Phone validation
     if (!formData.phone) {
       newErrors.phone = 'Phone number is required';
     } else if (!/^\+?[\d\s-()]{10,}$/.test(formData.phone)) {
-      newErrors.phone = 'Phone number is invalid';
-    } else if (!availabilityStatus.phone.available) {
-      console.log('❌ Form validation: Phone already exists in database');
+      newErrors.phone = 'Please enter a valid phone number (minimum 10 digits)';
+    } else if (formData.phone && !availabilityStatus.phone.checking && !availabilityStatus.phone.available) {
       newErrors.phone = 'Phone number is already registered. Please try a different phone number.';
-    } else {
-      console.log('✅ Form validation: Phone is available in database');
     }
-    
+
+    // Password validation
     if (!formData.password) {
       newErrors.password = 'Password is required';
     } else if (formData.password.length < 6) {
       newErrors.password = 'Password must be at least 6 characters';
     } else if (formData.password.length < 8) {
       newErrors.password = 'Password should be at least 8 characters for better security';
+    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
+      newErrors.password = 'Password should contain at least one uppercase letter, one lowercase letter, and one number';
     }
-    
-    if (formData.password !== formData.confirmPassword) {
+
+    // Confirm password validation
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password';
+    } else if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
     }
-    
+
+    // Captcha validation
     if (!captchaValid) {
       newErrors.captcha = 'Please complete the security verification';
     }
 
+    // Terms validation
     if (!formData.acceptTerms) {
       newErrors.acceptTerms = 'You must accept the Terms and Conditions to continue';
     }
@@ -201,15 +211,34 @@ const RegisterScreen = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Prevent multiple submissions
+    if (loading) return;
+    
+    // Check submit attempts limit
+    if (submitAttempts >= 3) {
+      setErrors({ submit: 'Too many submission attempts. Please wait a few minutes before trying again.' });
+      return;
+    }
+    
     if (validateForm()) {
+<<<<<<< HEAD
       setIsSendingOtp(true); // Start the specific OTP sending loading state
+=======
+      setSubmitAttempts(prev => prev + 1);
+      
+>>>>>>> 4005cf3262bcc943e25cb00d9a23fb202eabee2f
       try {
         console.log('Starting registration process...');
+        
+        // Clear any previous errors
+        setErrors({});
+        
         // Prepare payload for backend
         const payload = {
-          full_name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
+          full_name: formData.name.trim(),
+          email: formData.email.toLowerCase().trim(),
+          phone: formData.phone.trim(),
           password: formData.password
         };
         console.log('Registration payload:', payload);
@@ -220,6 +249,9 @@ const RegisterScreen = () => {
         // Check if registration was successful
         if (result && result.success) {
           console.log('Registration successful, navigating to OTP verification...');
+          
+          // Show success message briefly before navigation
+          setErrors({ success: 'Registration successful! Redirecting to verification...' });
           
           // Preserve any redirect context for after OTP verification
           const searchContext = localStorage.getItem('searchRedirectContext');
@@ -232,10 +264,25 @@ const RegisterScreen = () => {
             localStorage.setItem('pendingPreviewContext', previewContext);
           }
           
-          navigate('/verify-otp');
+          // Small delay to show success message
+          setTimeout(() => {
+            navigate('/verify-otp');
+          }, 1000);
         } else {
           console.log('Registration failed:', result.error);
-          setErrors({ submit: result.error || 'Registration failed. Please try again.' });
+          
+          // Handle specific error types
+          if (result.type === 'email_exists') {
+            setErrors({ email: result.error });
+          } else if (result.type === 'phone_exists') {
+            setErrors({ phone: result.error });
+          } else if (result.type === 'both_exist') {
+            setErrors({ email: result.error, phone: result.error });
+          } else if (result.type === 'registration_in_progress') {
+            setErrors({ submit: result.error });
+          } else {
+            setErrors({ submit: result.error || 'Registration failed. Please try again.' });
+          }
         }
       } catch (error) {
         console.error('Registration error:', error);
@@ -253,23 +300,39 @@ const RegisterScreen = () => {
       [name]: type === 'checkbox' ? checked : value
     }));
     
-    // Clear field error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
+    // Clear all errors when user starts typing
+    setErrors(prev => {
+      const newErrors = { ...prev };
+      
+      // Clear the specific field error
+      if (newErrors[name]) {
+        delete newErrors[name];
+      }
+      
+      // Clear submit error
+      if (newErrors.submit) {
+        delete newErrors.submit;
+      }
+      
+      // Clear success message
+      if (newErrors.success) {
+        delete newErrors.success;
+      }
+      
+      // Clear captcha error if user is typing in any field
+      if (newErrors.captcha) {
+        delete newErrors.captcha;
+      }
+      
+      // Clear acceptTerms error if user is typing in any field
+      if (newErrors.acceptTerms) {
+        delete newErrors.acceptTerms;
+      }
+      
+      return newErrors;
+    });
     
-    // Clear submit error when user starts typing
-    if (errors.submit) {
-      setErrors(prev => ({
-        ...prev,
-        submit: ''
-      }));
-    }
-    
-    // Reset availability status when user starts typing
+    // Reset availability status when user starts typing in email or phone
     if (name === 'email' || name === 'phone') {
       setAvailabilityStatus(prev => ({
         ...prev,
@@ -281,6 +344,19 @@ const RegisterScreen = () => {
   const handleTermsClick = (e) => {
     e.preventDefault();
     setShowTerms(true);
+  };
+
+  const handleFocus = (e) => {
+    const { name } = e.target;
+    
+    // Clear the specific field error when user focuses on the input
+    if (errors[name]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
   };
 
   return (
@@ -299,19 +375,18 @@ const RegisterScreen = () => {
           {/* Form Container */}
           <div className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border border-white/20">
             <div className="text-center mb-8">
-
               <h2 className="text-3xl font-bold text-gray-900 mb-2" style={{fontFamily: 'Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>Create Account</h2>
               <p className="text-gray-600" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>Join UNITY Nest today</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-8">
               {/* Name Field */}
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-2" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
                   Full Name
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
                     <User className={`h-5 w-5 ${errors.name ? 'text-red-400' : 'text-gray-400'}`} />
                   </div>
                   <input
@@ -319,32 +394,32 @@ const RegisterScreen = () => {
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
+                    onFocus={handleFocus}
                     className={`w-full pl-10 pr-4 py-3 border-2 rounded-lg transition-all duration-300 ${
                       errors.name 
-                        ? 'border-red-400 bg-red-50 focus:ring-red-200 focus:border-red-500' 
+                        ? 'border-red-400 focus:ring-red-200 focus:border-red-500' 
                         : 'border-gray-300 focus:ring-blue-200 focus:border-blue-500'
                     }`}
                     placeholder="Enter your full name"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
+                    disabled={loading}
                   />
-                  {errors.name && (
-                    <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                      <p className="text-sm text-red-700 font-medium">{errors.name}</p>
-                    </div>
-                  )}
                 </div>
+                {errors.name && (
+                  <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                    <p className="text-sm text-red-700 font-medium">{errors.name}</p>
+                  </div>
+                )}
               </div>
 
               {/* Email Field */}
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-2" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
                   Email Address
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
                     <Mail className={`h-5 w-5 ${errors.email || (formData.email && !availabilityStatus.email.checking && !availabilityStatus.email.available) ? 'text-red-400' : formData.email && !availabilityStatus.email.checking && availabilityStatus.email.available ? 'text-green-400' : 'text-gray-400'}`} />
                   </div>
                   <input
@@ -352,63 +427,49 @@ const RegisterScreen = () => {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
+                    onFocus={handleFocus}
                     className={`w-full pl-10 pr-12 py-3 border-2 rounded-lg transition-all duration-300 ${
                       errors.email || (formData.email && !availabilityStatus.email.checking && !availabilityStatus.email.available)
-                        ? 'border-red-400 bg-red-50 focus:ring-red-200 focus:border-red-500' 
+                        ? 'border-red-400 focus:ring-red-200 focus:border-red-500' 
                         : formData.email && !availabilityStatus.email.checking && availabilityStatus.email.available
-                        ? 'border-green-400 bg-green-50 focus:ring-green-200 focus:border-green-500'
+                        ? 'border-green-400 focus:ring-green-200 focus:border-green-500'
                         : 'border-gray-300 focus:ring-blue-200 focus:border-blue-500'
                     }`}
                     placeholder="Enter your email"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
+                    disabled={loading}
                   />
                   {/* Availability indicator */}
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center z-10">
                     {availabilityStatus.email.checking && (
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
                     )}
                     {!availabilityStatus.email.checking && formData.email && (
                       <>
                         {availabilityStatus.email.available ? (
-                          <svg className="h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
+                          <CheckCircle className="h-5 w-5 text-green-500" />
                         ) : (
-                          <svg className="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                          </svg>
+                          <AlertCircle className="h-5 w-5 text-red-500" />
                         )}
                       </>
                     )}
                   </div>
                 </div>
-                
-                {/* Error and Success Messages - Outside the relative container */}
                 {errors.email && (
                   <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
+                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
                     <p className="text-sm text-red-700 font-medium">{errors.email}</p>
                   </div>
                 )}
-                {formData.email && !availabilityStatus.email.checking && availabilityStatus.email.available && !errors.email && (
-                  <div className="mt-2 flex items-center space-x-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                     <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                     </svg>
-                     <p className="text-sm text-green-700 font-medium">✓ Email is available</p>
-                   </div>
-                 )}
               </div>
 
               {/* Phone Field */}
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-2" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
                   Phone Number
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
                     <Phone className={`h-5 w-5 ${errors.phone || (formData.phone && !availabilityStatus.phone.checking && !availabilityStatus.phone.available) ? 'text-red-400' : formData.phone && !availabilityStatus.phone.checking && availabilityStatus.phone.available ? 'text-green-400' : 'text-gray-400'}`} />
                   </div>
                   <input
@@ -416,63 +477,49 @@ const RegisterScreen = () => {
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
+                    onFocus={handleFocus}
                     className={`w-full pl-10 pr-12 py-3 border-2 rounded-lg transition-all duration-300 ${
                       errors.phone || (formData.phone && !availabilityStatus.phone.checking && !availabilityStatus.phone.available)
-                        ? 'border-red-400 bg-red-50 focus:ring-red-200 focus:border-red-500' 
+                        ? 'border-red-400 focus:ring-red-200 focus:border-red-500' 
                         : formData.phone && !availabilityStatus.phone.checking && availabilityStatus.phone.available
-                        ? 'border-green-400 bg-green-50 focus:ring-green-200 focus:border-green-500'
+                        ? 'border-green-400 focus:ring-green-200 focus:border-green-500'
                         : 'border-gray-300 focus:ring-blue-200 focus:border-blue-500'
                     }`}
-                    placeholder="+91 9876543210"
+                    placeholder="Enter your phone number"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
+                    disabled={loading}
                   />
                   {/* Availability indicator */}
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center z-10">
                     {availabilityStatus.phone.checking && (
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
                     )}
                     {!availabilityStatus.phone.checking && formData.phone && (
                       <>
                         {availabilityStatus.phone.available ? (
-                          <svg className="h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
+                          <CheckCircle className="h-5 w-5 text-green-500" />
                         ) : (
-                          <svg className="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                          </svg>
+                          <AlertCircle className="h-5 w-5 text-red-500" />
                         )}
                       </>
                     )}
                   </div>
                 </div>
-                
-                {/* Error and Success Messages - Outside the relative container */}
                 {errors.phone && (
                   <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
+                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
                     <p className="text-sm text-red-700 font-medium">{errors.phone}</p>
-                  </div>
-                )}
-                {formData.phone && !availabilityStatus.phone.checking && availabilityStatus.phone.available && !errors.phone && (
-                  <div className="mt-2 flex items-center space-x-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    <p className="text-sm text-green-700 font-medium">✓ Phone number is available</p>
                   </div>
                 )}
               </div>
 
               {/* Password Field */}
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-2" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
                   Password
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
                     <Lock className={`h-5 w-5 ${errors.password ? 'text-red-400' : 'text-gray-400'}`} />
                   </div>
                   <input
@@ -480,43 +527,47 @@ const RegisterScreen = () => {
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
+                    onFocus={handleFocus}
                     className={`w-full pl-10 pr-12 py-3 border-2 rounded-lg transition-all duration-300 ${
                       errors.password 
-                        ? 'border-red-400 bg-red-50 focus:ring-red-200 focus:border-red-500' 
+                        ? 'border-red-400 focus:ring-red-200 focus:border-red-500' 
                         : 'border-gray-300 focus:ring-blue-200 focus:border-blue-500'
                     }`}
                     placeholder="Create a password"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
+                    disabled={loading}
                   />
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center hover:text-gray-600 transition-colors"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
-                  </button>
-                  {errors.password && (
-                    <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                      <p className="text-sm text-red-700 font-medium">{errors.password}</p>
-                    </div>
-                  )}
+                  {/* Eye icon indicator */}
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center z-10">
+                    <button
+                      type="button"
+                      className="hover:text-gray-600 transition-colors"
+                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={loading}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
+                {errors.password && (
+                  <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                    <p className="text-sm text-red-700 font-medium">{errors.password}</p>
+                  </div>
+                )}
               </div>
 
               {/* Confirm Password Field */}
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-2" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
                   Confirm Password
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
                     <Lock className={`h-5 w-5 ${errors.confirmPassword ? 'text-red-400' : 'text-gray-400'}`} />
                   </div>
                   <input
@@ -524,84 +575,95 @@ const RegisterScreen = () => {
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleChange}
+                    onFocus={handleFocus}
                     className={`w-full pl-10 pr-12 py-3 border-2 rounded-lg transition-all duration-300 ${
                       errors.confirmPassword 
-                        ? 'border-red-400 bg-red-50 focus:ring-red-200 focus:border-red-500' 
+                        ? 'border-red-400 focus:ring-red-200 focus:border-red-500' 
                         : 'border-gray-300 focus:ring-blue-200 focus:border-blue-500'
                     }`}
                     placeholder="Confirm your password"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
+                    disabled={loading}
                   />
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center hover:text-gray-600 transition-colors"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
-                  </button>
-                  {errors.confirmPassword && (
-                    <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                      <p className="text-sm text-red-700 font-medium">{errors.confirmPassword}</p>
-                    </div>
-                  )}
+                  {/* Eye icon indicator */}
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center z-10">
+                    <button
+                      type="button"
+                      className="hover:text-gray-600 transition-colors"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      disabled={loading}
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
+                {errors.confirmPassword && (
+                  <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                    <p className="text-sm text-red-700 font-medium">{errors.confirmPassword}</p>
+                  </div>
+                )}
               </div>
 
               {/* Captcha Field */}
-              <Captcha onValidationChange={setCaptchaValid} />
-              {errors.captcha && (
-                <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                  <p className="text-sm text-red-700 font-medium">{errors.captcha}</p>
-                </div>
-              )}
+              <div className="relative">
+                <Captcha onValidationChange={setCaptchaValid} />
+                {errors.captcha && (
+                  <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                    <p className="text-sm text-red-700 font-medium">{errors.captcha}</p>
+                  </div>
+                )}
+              </div>
 
               {/* Terms and Conditions Checkbox */}
-              <div className="flex items-start space-x-3">
-                <input
-                  type="checkbox"
-                  name="acceptTerms"
-                  checked={formData.acceptTerms}
-                  onChange={handleChange}
-                  className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <div className="flex-1">
-                  <label className="text-sm text-gray-700" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
-                    I agree to the{' '}
-                    <button
-                      type="button"
-                      onClick={handleTermsClick}
-                      className="text-blue-600 hover:text-blue-700 underline font-medium"
-                      style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
-                    >
-                      Terms and Conditions
-                    </button>
-                    {' '}of UNITY Nest
-                  </label>
-                  {errors.acceptTerms && (
-                    <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                      <p className="text-sm text-red-700 font-medium">{errors.acceptTerms}</p>
-                    </div>
-                  )}
+              <div className="relative">
+                <div className="flex items-start space-x-3">
+                  <input
+                    type="checkbox"
+                    name="acceptTerms"
+                    checked={formData.acceptTerms}
+                    onChange={handleChange}
+                    onFocus={handleFocus}
+                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    disabled={loading}
+                  />
+                  <div className="flex-1">
+                    <label className="text-sm text-gray-700" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
+                      I agree to the{' '}
+                      <button
+                        type="button"
+                        onClick={handleTermsClick}
+                        className="text-blue-600 hover:text-blue-700 underline font-medium"
+                        style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
+                        disabled={loading}
+                      >
+                        Terms and Conditions
+                      </button>
+                      {' '}of UNITY Nest
+                    </label>
+                  </div>
                 </div>
+                {errors.acceptTerms && (
+                  <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                    <p className="text-sm text-red-700 font-medium">{errors.acceptTerms}</p>
+                  </div>
+                )}
               </div>
 
               {/* Submit Button */}
               <button
                 type="submit"
+<<<<<<< HEAD
                 disabled={loading || isSendingOtp}
+=======
+                disabled={loading || submitAttempts >= 3}
+>>>>>>> 4005cf3262bcc943e25cb00d9a23fb202eabee2f
                 className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-4 rounded-xl font-semibold hover:from-blue-700 hover:to-cyan-600 hover:scale-105 transition-all duration-300 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
                 style={{fontFamily: 'Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
               >
@@ -615,15 +677,29 @@ const RegisterScreen = () => {
                 )}
               </button>
               
+              {/* Success Message */}
+              {errors.success && (
+                <div className="mt-2 flex items-center space-x-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                  <p className="text-sm text-green-700 font-medium">{errors.success}</p>
+                </div>
+              )}
+              
               {/* Submit Error */}
               {errors.submit && (
-                <div className="bg-red-50 border-2 border-red-200 text-red-700 px-4 py-4 rounded-xl text-center shadow-sm">
-                  <div className="flex items-center justify-center space-x-2">
-                    <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    <span className="font-medium">{errors.submit}</span>
-                  </div>
+                <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                  <p className="text-sm text-red-700 font-medium">{errors.submit}</p>
+                </div>
+              )}
+
+              {/* Submit Attempts Warning */}
+              {submitAttempts >= 2 && (
+                <div className="mt-2 flex items-center space-x-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <AlertCircle className="w-4 h-4 text-yellow-500 flex-shrink-0" />
+                  <p className="text-sm text-yellow-700 font-medium">
+                    {submitAttempts}/3 attempts used. Too many failed attempts will require a cooldown period.
+                  </p>
                 </div>
               )}
             </form>
