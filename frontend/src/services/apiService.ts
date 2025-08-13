@@ -54,12 +54,17 @@ validateHttps();
 
 const api = axios.create({
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   baseURL: getApiUrl(),
   timeout: process.env.NODE_ENV === 'production' ? 30000 : 15000, // 30s timeout for production
   headers: {
     'Content-Type': 'application/json',
     'X-Requested-With': 'XMLHttpRequest'
   }
+=======
+  baseURL: 'http://localhost:3000', // HTTP backend URL
+  timeout: 10000, // 10 seconds timeout
+>>>>>>> Stashed changes
 =======
   baseURL: 'http://localhost:3000', // HTTP backend URL
   timeout: 10000, // 10 seconds timeout
