@@ -558,4 +558,42 @@ exports.testEmailService = async (req, res, next) => {
     console.error('Email service test error:', err);
     next(err);
   }
+};
+
+// Clear pending registration endpoint
+exports.clearPendingRegistration = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      throw new ValidationError('Email is required');
+    }
+    
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    console.log('Clearing pending registration for:', normalizedEmail);
+    
+    // Check if there's a pending registration
+    if (pendingRegistrations.has(normalizedEmail)) {
+      pendingRegistrations.delete(normalizedEmail);
+      console.log('Pending registration cleared for:', normalizedEmail);
+      
+      res.json({
+        success: true,
+        message: 'Pending registration cleared successfully',
+        email: normalizedEmail
+      });
+    } else {
+      console.log('No pending registration found for:', normalizedEmail);
+      
+      res.json({
+        success: true,
+        message: 'No pending registration found for this email',
+        email: normalizedEmail
+      });
+    }
+  } catch (err) {
+    console.error('Clear pending registration error:', err);
+    next(err);
+  }
 }; 

@@ -13,14 +13,14 @@ declare module 'axios' {
 // API Configuration - Update this URL for production
 const API_CONFIG = {
   // Development URL (localhost backend)
-  development: 'http://localhost:3000',
+  development: 'http://103.127.146.54:3000',
   
   // Production URL - Update this to your production backend URL
-  production: ''
+  production: 'http://103.127.146.54:3000'
 };
 
 // Force production API (set to true to always use production backend)
-const FORCE_PRODUCTION_API = false;
+const FORCE_PRODUCTION_API = true;
 
 // Get API URL based on environment
 const getApiUrl = () => {
@@ -160,6 +160,17 @@ export const checkAvailability = async (email?: string, phone?: string, retries 
       // Wait before retrying (exponential backoff)
       await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
     }
+  }
+};
+
+// Clear pending registration
+export const clearPendingRegistration = async (email: string) => {
+  try {
+    const response = await api.post('/auth/clear-pending-registration', { email });
+    return response.data;
+  } catch (error) {
+    console.error('Error clearing pending registration:', error);
+    throw error;
   }
 };
 

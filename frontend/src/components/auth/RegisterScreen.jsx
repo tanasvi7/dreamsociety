@@ -6,7 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft, Loader, AlertCircle, CheckCircle } from 'lucide-react';
 import Captcha from '../common/Captcha';
 import TermsAndConditions from '../common/TermsAndConditions';
-import { apiPost, checkAvailability } from '../../services/apiService';
+import { apiPost, checkAvailability, clearPendingRegistration } from '../../services/apiService';
 import WelcomeHeader from '../welcome/WelcomeHeader';
 
 // Utility function to clear stuck registration state
@@ -391,20 +391,38 @@ const RegisterScreen = () => {
   };
 
   // Manual reset function for stuck registration state
-  const handleManualReset = () => {
-    // Clear all registration-related localStorage items
-    localStorage.removeItem('currentRegistrationEmail');
-    localStorage.removeItem('registrationStartTime');
-    localStorage.removeItem('pendingRegistrationEmail');
-    localStorage.removeItem('registrationTimestamp');
-    
-    // Clear form errors
-    setErrors({});
-    
-    // Reset submit attempts
-    setSubmitAttempts(0);
-    
-    console.log('Manual registration reset completed');
+  const handleManualReset = async () => {
+    try {
+      // Clear all registration-related localStorage items
+      localStorage.removeItem('currentRegistrationEmail');
+      localStorage.removeItem('registrationStartTime');
+      localStorage.removeItem('pendingRegistrationEmail');
+      localStorage.removeItem('registrationTimestamp');
+      
+      // Clear form errors
+      setErrors({});
+      
+      // Reset submit attempts
+      setSubmitAttempts(0);
+      
+      // If we have an email in the form, try to clear the pending registration on the backend
+      if (formData.email) {
+        try {
+          const result = await clearPendingRegistration(formData.email.toLowerCase().trim());
+          console.log('Backend registration cleared:', result.message);
+        } catch (error) {
+          console.log('Error clearing backend registration:', error.message);
+          // Continue with frontend reset even if backend call fails
+        }
+      }
+      
+      console.log('Manual registration reset completed');
+    } catch (error) {
+      console.error('Error during manual reset:', error);
+      // Still clear frontend state even if there's an error
+      setErrors({});
+      setSubmitAttempts(0);
+    }
   };
 
   // Debug function to test backend connectivity
@@ -741,15 +759,6 @@ const RegisterScreen = () => {
                 )}
               </button>
               
-              {/* Debug Button (for troubleshooting) */}
-              <button
-                type="button"
-                onClick={handleDebugBackend}
-                className="w-full bg-gray-500 text-white py-2 rounded-lg font-medium hover:bg-gray-600 transition-all duration-300 text-sm"
-                style={{fontFamily: 'Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
-              >
-                Test Backend Connection
-              </button>
               
               {/* Success Message */}
               {errors.success && (
@@ -765,8 +774,9 @@ const RegisterScreen = () => {
                   <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
                   <div className="flex-1">
                     <p className="text-sm text-red-700 font-medium">{errors.submit}</p>
-                    {/* Show reset button for backend unavailable errors */}
-                    {errors.submit.includes('Cannot connect to the server') && (
+                    {/* Show reset button for backend unavailable errors or registration in progress */}
+                    {(errors.submit.includes('Cannot connect to the server') || 
+                      errors.submit.includes('Registration already in progress')) && (
                       <button
                         type="button"
                         onClick={handleManualReset}

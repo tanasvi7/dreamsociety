@@ -66,16 +66,59 @@ app.use(helmet({
 
 // CORS configuration
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? [
-        'https://dreamssociety.in',
-        'https://api.dreamssociety.in'
-      ]
-    : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:8080', 'http://127.0.0.1:5173', 'http://127.0.0.1:8080'],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if CORS_ORIGIN environment variable is set
+    if (process.env.CORS_ORIGIN) {
+      const allowedOrigins = process.env.CORS_ORIGIN.split(',').map(origin => origin.trim());
+      if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+        return callback(null, true);
+      }
+    }
+    
+    // Default allowed origins
+    const allowedOrigins = process.env.NODE_ENV === 'production' 
+      ? [
+          'https://dreamssociety.in',
+          'https://www.dreamssociety.in',
+          'https://api.dreamssociety.in',
+          'http://103.127.146.54:3000',
+          'http://103.127.146.54:5173',
+          'http://103.127.146.54:8080'
+        ]
+
+      : [
+          'http://localhost:3000', 
+          'http://localhost:5173', 
+          'http://localhost:8080', 
+          'http://127.0.0.1:5173', 
+          'http://127.0.0.1:8080',
+          'http://localhost:4173'
+        ];
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      console.log('Allowed origins:', allowedOrigins);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   optionsSuccessStatus: 200,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
+  ],
+  exposedHeaders: ['Content-Length', 'X-Requested-With']
 };
 
 app.use(cors(corsOptions));
@@ -153,11 +196,40 @@ app.get('/env-check', (req, res) => {
     DB_NAME: process.env.DB_NAME,
     DB_USER: process.env.DB_USER ? 'SET' : 'MISSING',
     GMAIL_USER: process.env.GMAIL_USER ? 'SET' : 'MISSING',
-    GMAIL_APP_PASSWORD: process.env.GMAIL_APP_PASSWORD ? 'SET' : 'MISSING'
+    GMAIL_APP_PASSWORD: process.env.GMAIL_APP_PASSWORD ? 'SET' : 'MISSING',
+    CORS_ORIGIN: process.env.CORS_ORIGIN || 'NOT_SET'
   };
   
   res.json({
     environment: envVars,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// CORS debug endpoint
+app.get('/cors-debug', (req, res) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = process.env.NODE_ENV === 'production' 
+    ? [
+        'https://dreamssociety.in',
+        'https://www.dreamssociety.in',
+        'https://api.dreamssociety.in'
+      ]
+    : [
+        'http://localhost:3000', 
+        'http://localhost:5173', 
+        'http://localhost:8080', 
+        'http://127.0.0.1:5173', 
+        'http://127.0.0.1:8080',
+        'http://localhost:4173'
+      ];
+  
+  res.json({
+    requestOrigin: origin,
+    allowedOrigins: allowedOrigins,
+    corsOrigin: process.env.CORS_ORIGIN || 'NOT_SET',
+    nodeEnv: process.env.NODE_ENV,
+    isAllowed: allowedOrigins.includes(origin),
     timestamp: new Date().toISOString()
   });
 });
@@ -226,4 +298,3 @@ sequelize.authenticate()
     console.error('Unable to connect to DB:', err);
     process.exit(1);
   });
-  

@@ -161,6 +161,31 @@ router.post('/test-email', authController.testEmailService);
 
 /**
  * @swagger
+ * /auth/clear-pending-registration:
+ *   post:
+ *     summary: Clear pending registration for an email
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Pending registration cleared successfully
+ *       400:
+ *         description: Invalid request
+ */
+router.post('/clear-pending-registration', authController.clearPendingRegistration);
+
+/**
+ * @swagger
  * /auth/token-info:
  *   get:
  *     summary: Get current token information

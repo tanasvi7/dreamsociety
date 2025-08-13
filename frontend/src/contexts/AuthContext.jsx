@@ -412,7 +412,7 @@ export const AuthProvider = ({ children }) => {
         };
       }
       
-      // Make the API call without retry for registration in progress errors
+      // Make the API call with proper error handling
       let response;
       try {
         response = await api.post('/auth/register', userData, {
@@ -423,22 +423,46 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('currentRegistrationEmail');
         localStorage.removeItem('registrationStartTime');
         
-        // If it's a "registration in progress" error, don't retry
-        if (error.response?.data?.message?.includes('Registration already in progress')) {
-          console.log('AuthContext: Backend reports registration in progress, clearing frontend state');
-          return {
-            success: false,
-            error: 'Registration already in progress for this email. Please check your email for OTP or wait a few minutes before trying again.',
-            type: 'registration_in_progress'
-          };
+        // Check if it's a "registration in progress" error or validation error
+        if (error.response?.status === 400) {
+          const errorMessage = error.response?.data?.message || '';
+          
+          // If it's a "registration in progress" error, don't retry
+          if (errorMessage.includes('Registration already in progress')) {
+            console.log('AuthContext: Backend reports registration in progress, not retrying');
+            return {
+              success: false,
+              error: 'Registration already in progress for this email. Please check your email for OTP or wait a few minutes before trying again.',
+              type: 'registration_in_progress'
+            };
+          }
+          
+          // If it's a validation error (400), don't retry
+          if (errorMessage.includes('already registered') || 
+              errorMessage.includes('required') || 
+              errorMessage.includes('invalid') ||
+              errorMessage.includes('must be')) {
+            console.log('AuthContext: Backend validation error, not retrying');
+            return {
+              success: false,
+              error: errorMessage,
+              type: 'validation'
+            };
+          }
         }
         
-        // For other errors, use retry logic
-        response = await retryOperation(async () => {
-          return await api.post('/auth/register', userData, {
-            timeout: 20000
+        // For network errors or server errors (5xx), use retry logic
+        if (error.response?.status >= 500 || !error.response) {
+          console.log('AuthContext: Server error or network issue, attempting retry');
+          response = await retryOperation(async () => {
+            return await api.post('/auth/register', userData, {
+              timeout: 20000
+            });
           });
-        });
+        } else {
+          // For other client errors (4xx), don't retry
+          throw error;
+        }
       }
       
       console.log('AuthContext: Registration response:', response.data);
