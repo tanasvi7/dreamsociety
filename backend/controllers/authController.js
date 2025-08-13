@@ -155,25 +155,6 @@ exports.register = async (req, res, next) => {
       throw new ValidationError('Phone number is already registered. Please try a different phone number.');
     }
     
-    // Clean up expired registrations first
-    cleanupExpiredRegistrations();
-    
-    // Check if there's a pending registration
-    if (pendingRegistrations.has(normalizedEmail)) {
-      const registrationData = pendingRegistrations.get(normalizedEmail);
-      const timeSinceRegistration = Date.now() - registrationData.timestamp;
-      const tenMinutes = 10 * 60 * 1000;
-      
-      if (timeSinceRegistration > tenMinutes) {
-        // Remove expired registration
-        pendingRegistrations.delete(normalizedEmail);
-        console.log('Removed expired registration for:', normalizedEmail);
-      } else {
-        console.log('❌ VALIDATION FAILED: Registration already in progress for this email');
-        throw new ValidationError('Registration already in progress for this email. Please check your email for OTP or wait a few minutes before trying again.');
-      }
-    }
-    
     console.log('✅ VALIDATION PASSED: No existing user found in database, proceeding with registration...');
     
     // Hash password with higher salt rounds for production
@@ -188,6 +169,12 @@ exports.register = async (req, res, next) => {
       password_hash,
       timestamp: Date.now()
     };
+    
+    // Remove any existing pending registration for this email (allow re-registration)
+    if (pendingRegistrations.has(normalizedEmail)) {
+      pendingRegistrations.delete(normalizedEmail);
+      console.log('Removed existing pending registration for:', normalizedEmail);
+    }
     
     pendingRegistrations.set(normalizedEmail, registrationData);
     
@@ -596,4 +583,4 @@ exports.clearPendingRegistration = async (req, res, next) => {
     console.error('Clear pending registration error:', err);
     next(err);
   }
-}; 
+};
