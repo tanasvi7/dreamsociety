@@ -820,11 +820,6 @@ const RegisterScreen = () => {
             </div>
           </div>
 
-          {/* Back button */}
-          <Link to="/" className="absolute top-4 left-4 inline-flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors">
-            <ArrowLeft className="h-5 w-5" />
-            <span className="font-medium">Back to Home</span>
-          </Link>
         </div>
       </div>
 
