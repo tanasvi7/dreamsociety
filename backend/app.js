@@ -2,6 +2,9 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
+const helmet = require('helmet');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
 const { errorHandler, NotFoundError } = require('./middlewares/errorHandler');
 const { sequelize } = require('./models');
 const swaggerUi = require('swagger-ui-express');
@@ -16,16 +19,153 @@ const adminDashboardRouter = require('./routes/adminDashboard');
 const memberDashboardRouter = require('./routes/memberDashboard');
 const notificationsRouter = require('./routes/notifications');
 
+// Validate required environment variables
+const validateEnvironment = () => {
+  const requiredVars = [
+    'JWT_SECRET',
+    'JWT_EXPIRES_IN',
+    'DB_HOST',
+    'DB_USER',
+    'DB_PASSWORD',
+    'DB_NAME'
+  ];
+
+  const missing = requiredVars.filter(varName => !process.env[varName]);
+  
+  if (missing.length > 0) {
+    console.error('❌ Missing required environment variables:', missing);
+    process.exit(1);
+  }
+
+  // Validate JWT secret strength
+  if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
+    console.error('❌ JWT_SECRET must be at least 32 characters long');
+    process.exit(1);
+  }
+
+  console.log('✅ Environment validation passed');
+};
+
+// Run environment validation
+validateEnvironment();
+
 const app = express();
 
-app.use(cors({
-  origin: '*', // Allow all origins
-  credentials: true
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
 }));
-app.use(morgan('dev'));
-app.use(express.json());
-// Health check
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
+
+// CORS configuration
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' 
+    ? [
+        'https://dreamssociety.in',
+        'https://api.dreamssociety.in'
+      ]
+    : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:8080', 'http://127.0.0.1:5173', 'http://127.0.0.1:8080'],
+  credentials: true,
+  optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+};
+
+app.use(cors(corsOptions));
+
+// Compression middleware
+app.use(compression());
+
+// Logging middleware
+if (process.env.NODE_ENV === 'production') {
+  app.use(morgan('combined'));
+} else {
+  app.use(morgan('dev'));
+}
+
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Global rate limiting
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: process.env.NODE_ENV === 'production' ? 100 : 1000, // limit each IP to 100 requests per windowMs in production
+  message: {
+    error: 'Too many requests from this IP, please try again later.',
+    code: 'RATE_LIMIT_EXCEEDED'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use(globalLimiter);
+
+// Health check endpoint
+app.get('/health', async (req, res) => {
+  try {
+    // Test database connection
+    await sequelize.authenticate();
+    
+    // Check environment variables
+    const envCheck = {
+      JWT_SECRET: !!process.env.JWT_SECRET,
+      JWT_EXPIRES_IN: !!process.env.JWT_EXPIRES_IN,
+      NODE_ENV: process.env.NODE_ENV || 'development',
+      GMAIL_USER: !!process.env.GMAIL_USER,
+      GMAIL_APP_PASSWORD: !!process.env.GMAIL_APP_PASSWORD
+    };
+    
+    res.json({ 
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      database: 'connected',
+      environment: envCheck,
+      version: process.env.npm_package_version || '1.0.0'
+    });
+  } catch (error) {
+    console.error('Health check failed:', error);
+    res.status(500).json({ 
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      database: 'disconnected',
+      error: error.message
+    });
+  }
+});
+
+// Environment check endpoint (for debugging)
+app.get('/env-check', (req, res) => {
+  const envVars = {
+    NODE_ENV: process.env.NODE_ENV,
+    JWT_SECRET: process.env.JWT_SECRET ? 'SET' : 'MISSING',
+    JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || 'MISSING',
+    DATABASE_URL: process.env.DATABASE_URL ? 'SET' : 'MISSING',
+    DB_HOST: process.env.DB_HOST,
+    DB_PORT: process.env.DB_PORT,
+    DB_NAME: process.env.DB_NAME,
+    DB_USER: process.env.DB_USER ? 'SET' : 'MISSING',
+    GMAIL_USER: process.env.GMAIL_USER ? 'SET' : 'MISSING',
+    GMAIL_APP_PASSWORD: process.env.GMAIL_APP_PASSWORD ? 'SET' : 'MISSING'
+  };
+  
+  res.json({
+    environment: envVars,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// API Documentation
+if (process.env.NODE_ENV !== 'production') {
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+}
 
 // Auth routes
 app.use('/auth', require('./routes/auth'));
@@ -52,7 +192,6 @@ app.use('/search', require('./routes/search'));
 // Admin routes
 app.use('/admin', require('./routes/adminLogs'));
 app.use('/admin', require('./routes/bulkUpload'));
-app.use('/bulkUpload', require('./routes/bulkUpload'));
 app.use('/admin', require('./routes/adminUsers'));
 app.use('/admin', require('./routes/adminExport'));
 app.use('/admin/subscriptions', require('./routes/adminSubscriptions'));
@@ -63,9 +202,6 @@ app.use('/admin/education', adminEducationRouter);
 app.use('/admin/employment', adminEmploymentRouter);
 app.use('/admin/family', adminFamilyRouter);
 app.use('/notifications', notificationsRouter);
-
-// Swagger UI
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // 404 handler
 app.use((req, res, next) => {

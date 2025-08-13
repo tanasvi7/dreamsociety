@@ -1,4 +1,5 @@
 const { User } = require('../models');
+const { sequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { sendOTP, verifyOTP, resendOTP } = require('../utils/otpService');
@@ -23,6 +24,25 @@ const cleanupExpiredRegistrations = () => {
 
 // Run cleanup every 5 minutes
 setInterval(cleanupExpiredRegistrations, 5 * 60 * 1000);
+
+// Generate JWT token with proper claims
+const generateJWT = (user) => {
+  const payload = {
+    user_id: user.id,
+    email: user.email,
+    role: user.role,
+    login_time: Date.now(),
+    iat: Math.floor(Date.now() / 1000),
+    iss: 'dreamsociety',
+    aud: 'dreamsociety-users',
+    sub: user.id.toString()
+  };
+
+  return jwt.sign(payload, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRES_IN || '24h',
+    algorithm: 'HS256'
+  });
+};
 
 // Check email/phone availability endpoint
 exports.checkAvailability = async (req, res, next) => {
@@ -75,6 +95,29 @@ exports.register = async (req, res, next) => {
     
     if (!full_name || !email || !phone || !password) {
       throw new ValidationError('All fields are required');
+    }
+
+    // Validate password strength
+    if (password.length < 8) {
+      throw new ValidationError('Password must be at least 8 characters long');
+    }
+
+    // Check for common password patterns
+    const commonPasswords = ['password', '123456', 'qwerty', 'admin', 'user'];
+    if (commonPasswords.includes(password.toLowerCase())) {
+      throw new ValidationError('Password is too common. Please choose a stronger password');
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new ValidationError('Please enter a valid email address');
+    }
+
+    // Validate phone format (basic validation)
+    const phoneRegex = /^\+?[\d\s\-\(\)]{10,}$/;
+    if (!phoneRegex.test(phone)) {
+      throw new ValidationError('Please enter a valid phone number');
     }
     
     // Check if user already exists in database with precise error messages
@@ -133,8 +176,9 @@ exports.register = async (req, res, next) => {
     
     console.log('✅ VALIDATION PASSED: No existing user found in database, proceeding with registration...');
     
-    // Hash password
-    const password_hash = await bcrypt.hash(password, 10);
+    // Hash password with higher salt rounds for production
+    const saltRounds = process.env.NODE_ENV === 'production' ? 12 : 10;
+    const password_hash = await bcrypt.hash(password, saltRounds);
     
     // Store registration data temporarily (don't create user yet)
     const registrationData = {
@@ -165,6 +209,7 @@ exports.register = async (req, res, next) => {
 
 exports.login = async (req, res, next) => {
   try {
+    console.log('[LOGIN] Login attempt started');
     const { email, password } = req.body;
 
     // Input validation
@@ -183,41 +228,69 @@ exports.login = async (req, res, next) => {
       throw new ValidationError('Password must be at least 6 characters long');
     }
 
+    console.log('[LOGIN] Input validation passed, checking database connection...');
+    
+    // Check database connection
+    try {
+      await sequelize.authenticate();
+      console.log('[LOGIN] Database connection successful');
+    } catch (dbError) {
+      console.error('[LOGIN] Database connection failed:', dbError);
+      throw new Error('Database connection failed');
+    }
+
+    // Check environment variables
+    if (!process.env.JWT_SECRET) {
+      console.error('[LOGIN] JWT_SECRET environment variable is missing');
+      throw new Error('JWT_SECRET environment variable is missing');
+    }
+    
+    if (!process.env.JWT_EXPIRES_IN) {
+      console.error('[LOGIN] JWT_EXPIRES_IN environment variable is missing');
+      throw new Error('JWT_EXPIRES_IN environment variable is missing');
+    }
+
+    console.log('[LOGIN] Environment variables check passed');
+
     // Find user by email (case-insensitive)
+    console.log('[LOGIN] Searching for user with email:', email.toLowerCase());
     const user = await User.findOne({ where: { email: email.toLowerCase() } });
     
     if (!user) {
+      console.log('[LOGIN] User not found for email:', email);
       // Don't reveal if user exists or not for security
       throw new ValidationError('Invalid email or password');
     }
 
+    console.log('[LOGIN] User found, verifying password...');
+
     // Verify password
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
+      console.log('[LOGIN] Password verification failed for user:', user.email);
       throw new ValidationError('Invalid email or password');
     }
 
+    console.log('[LOGIN] Password verified successfully');
+
     // Check if user is verified
     if (!user.is_verified) {
+      console.log('[LOGIN] User not verified:', user.email);
       throw new ValidationError('Please verify your email address before logging in. Check your inbox for verification instructions.');
     }
 
     // Check if user account is active (you can add an is_active field)
     if (user.is_active === false) {
+      console.log('[LOGIN] User account deactivated:', user.email);
       throw new ValidationError('Your account has been deactivated. Please contact support.');
     }
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { 
-        user_id: user.id, 
-        email: user.email, 
-        role: user.role,
-        login_time: Date.now()
-      }, 
-      process.env.JWT_SECRET, 
-      { expiresIn: process.env.JWT_EXPIRES_IN }
-    );
+    console.log('[LOGIN] User verification and status checks passed, generating JWT...');
+
+    // Generate JWT token with proper claims
+    const token = generateJWT(user);
+
+    console.log('[LOGIN] JWT token generated successfully');
 
     // Log successful login
     console.log(`[LOGIN] Successful login for user: ${user.email} (ID: ${user.id})`);
@@ -236,6 +309,9 @@ exports.login = async (req, res, next) => {
     });
 
   } catch (err) {
+    console.error('[LOGIN] Error occurred:', err);
+    console.error('[LOGIN] Error stack:', err.stack);
+    
     // Log failed login attempts
     if (err instanceof ValidationError) {
       console.log(`[LOGIN] Failed login attempt for email: ${req.body.email} - ${err.message}`);
@@ -256,7 +332,8 @@ exports.login = async (req, res, next) => {
       console.error('[LOGIN] Unexpected error:', err);
       return res.status(500).json({ 
         error: 'Internal server error. Please try again later.',
-        type: 'server_error'
+        type: 'server_error',
+        details: process.env.NODE_ENV === 'development' ? err.message : undefined
       });
     }
   }
@@ -289,7 +366,8 @@ exports.verifyOtp = async (req, res, next) => {
         phone: registrationData.phone,
         password_hash: registrationData.password_hash,
         is_verified: true,
-        role: 'member'
+        role: 'member',
+        is_active: true
       });
       
       console.log('User created successfully with ID:', user.id);
@@ -297,12 +375,8 @@ exports.verifyOtp = async (req, res, next) => {
       // Remove from pending registrations
       pendingRegistrations.delete(email);
       
-      // Generate JWT token
-      const token = jwt.sign(
-        { user_id: user.id, email: user.email, role: user.role }, 
-        process.env.JWT_SECRET, 
-        { expiresIn: process.env.JWT_EXPIRES_IN }
-      );
+      // Generate JWT token with proper claims
+      const token = generateJWT(user);
       
       res.json({ 
         message: 'User verified and registered successfully',
@@ -393,4 +467,95 @@ exports.getMe = async (req, res, next) => {
       }
     });
   } catch (err) { next(err); }
+}; 
+
+// Test endpoint to check if admin user exists
+exports.testAdminUser = async (req, res, next) => {
+  try {
+    console.log('[TEST] Checking if admin user exists...');
+    
+    // Check database connection
+    await sequelize.authenticate();
+    console.log('[TEST] Database connection successful');
+    
+    // Look for admin user
+    const adminUser = await User.findOne({ 
+      where: { 
+        email: 'admin@gmail.com',
+        role: 'admin'
+      } 
+    });
+    
+    if (adminUser) {
+      console.log('[TEST] Admin user found:', adminUser.email);
+      res.json({ 
+        success: true, 
+        message: 'Admin user exists',
+        user: {
+          id: adminUser.id,
+          email: adminUser.email,
+          role: adminUser.role,
+          is_verified: adminUser.is_verified
+        }
+      });
+    } else {
+      console.log('[TEST] Admin user not found, creating one...');
+      
+      // Create admin user if it doesn't exist
+      const adminPasswordHash = await bcrypt.hash('admin123', 10);
+      const newAdminUser = await User.create({
+        full_name: 'Admin User',
+        email: 'admin@gmail.com',
+        phone: '+1234567890',
+        password_hash: adminPasswordHash,
+        role: 'admin',
+        is_verified: true
+      });
+      
+      console.log('[TEST] Admin user created successfully:', newAdminUser.email);
+      res.json({ 
+        success: true, 
+        message: 'Admin user created successfully',
+        user: {
+          id: newAdminUser.id,
+          email: newAdminUser.email,
+          role: newAdminUser.role,
+          is_verified: newAdminUser.is_verified
+        }
+      });
+    }
+  } catch (error) {
+    console.error('[TEST] Error checking/creating admin user:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+}; 
+
+exports.testEmailService = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      throw new ValidationError('Email is required for testing');
+    }
+    
+    console.log('Testing email service for:', email);
+    
+    // Test basic email sending
+    const { sendOTP } = require('../utils/otpService');
+    const result = await sendOTP(email);
+    
+    res.json({
+      success: true,
+      message: 'Email service test successful',
+      email: email,
+      result: result
+    });
+  } catch (err) {
+    console.error('Email service test error:', err);
+    next(err);
+  }
 }; 

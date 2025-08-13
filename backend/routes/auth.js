@@ -153,6 +153,12 @@ router.post('/verify-otp', otpLimiter, authController.verifyOtp);
  */
 router.post('/resend-otp', otpLimiter, authController.resendOtp);
 
+// Test endpoint to check admin user (for debugging)
+router.get('/test-admin', authController.testAdminUser);
+
+// Test endpoint for email service
+router.post('/test-email', authController.testEmailService);
+
 /**
  * @swagger
  * /auth/token-info:

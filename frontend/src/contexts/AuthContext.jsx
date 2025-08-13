@@ -21,8 +21,16 @@ const handleApiError = (error, operation = 'operation') => {
   let errorType = 'general';
   
   if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
-    errorMessage = 'No internet connection. Please check your network and try again.';
-    errorType = 'network';
+    // Check if it's a connection refused error (backend not running)
+    if (error.message.includes('ERR_CONNECTION_REFUSED') || 
+        error.message.includes('Failed to fetch') ||
+        error.message.includes('net::ERR_CONNECTION_REFUSED')) {
+      errorMessage = 'Backend server is not running. Please start the backend server or check the connection.';
+      errorType = 'backend_unavailable';
+    } else {
+      errorMessage = 'No internet connection. Please check your network and try again.';
+      errorType = 'network';
+    }
   } else if (error.code === 'ECONNABORTED') {
     errorMessage = 'Request timed out. Please try again.';
     errorType = 'timeout';
@@ -52,7 +60,15 @@ const handleApiError = (error, operation = 'operation') => {
         errorType = 'rate_limit';
         break;
       case 500:
-        errorMessage = 'Server error. Please try again later.';
+        // Enhanced 500 error handling
+        console.error('Server 500 error details:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data,
+          url: error.config?.url,
+          method: error.config?.method
+        });
+        errorMessage = errorData?.error || errorData?.message || 'Server error. Please try again later or contact support.';
         errorType = 'server_error';
         break;
       case 502:
@@ -241,17 +257,195 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Test backend connectivity and get detailed error information
+  const testBackendConnection = async () => {
+    try {
+      console.log('Testing backend connectivity...');
+      
+      // Test health endpoint
+      const healthResponse = await api.get('/health');
+      console.log('Health check response:', healthResponse.data);
+      
+      // Check environment variables
+      try {
+        const envResponse = await api.get('/env-check');
+        console.log('Environment check response:', envResponse.data);
+        
+        if (envResponse.data.environment.JWT_SECRET === 'MISSING') {
+          return {
+            success: false,
+            error: 'JWT_SECRET environment variable is missing on server',
+            details: envResponse.data
+          };
+        }
+        
+        if (envResponse.data.environment.JWT_EXPIRES_IN === 'MISSING') {
+          return {
+            success: false,
+            error: 'JWT_EXPIRES_IN environment variable is missing on server',
+            details: envResponse.data
+          };
+        }
+      } catch (envError) {
+        console.log('Environment check failed:', envError.response?.data);
+      }
+      
+      // Check if database is connected
+      if (healthResponse.data.database === 'disconnected') {
+        return {
+          success: false,
+          error: 'Database connection failed',
+          details: healthResponse.data
+        };
+      }
+      
+      // Test auth endpoint with a simple request
+      try {
+        const authResponse = await api.get('/auth/check-availability');
+        console.log('Auth endpoint test response:', authResponse.data);
+      } catch (authError) {
+        console.log('Auth endpoint test failed (this might be expected):', authError.response?.data);
+      }
+      
+      // Test admin user endpoint
+      try {
+        const adminTestResponse = await api.get('/auth/test-admin');
+        console.log('Admin user test response:', adminTestResponse.data);
+        
+        if (!adminTestResponse.data.success) {
+          return {
+            success: false,
+            error: 'Admin user not found in database',
+            details: adminTestResponse.data
+          };
+        }
+      } catch (adminError) {
+        console.log('Admin user test failed:', adminError.response?.data);
+        return {
+          success: false,
+          error: 'Admin user test failed',
+          details: adminError.response?.data
+        };
+      }
+      
+      return { 
+        success: true, 
+        message: 'Backend is working properly',
+        details: healthResponse.data
+      };
+    } catch (error) {
+      console.error('Backend connectivity test failed:', error);
+      
+      if (error.response) {
+        console.error('Response error details:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data,
+          headers: error.response.headers
+        });
+        
+        return {
+          success: false,
+          error: `Backend error: ${error.response.status} - ${error.response.statusText}`,
+          details: error.response.data
+        };
+      } else if (error.request) {
+        return {
+          success: false,
+          error: 'No response from backend server',
+          details: error.request
+        };
+      } else {
+        return {
+          success: false,
+          error: 'Network error',
+          details: error.message
+        };
+      }
+    }
+  };
+
   const register = async (userData) => {
     try {
       console.log('AuthContext: Starting registration process');
       
-      const response = await retryOperation(async () => {
-        return await api.post('/auth/register', userData, {
+      // Frontend-only protection: Check if we're already processing a registration
+      const currentRegistrationEmail = localStorage.getItem('currentRegistrationEmail');
+      const registrationStartTime = localStorage.getItem('registrationStartTime');
+      
+      if (currentRegistrationEmail === userData.email && registrationStartTime) {
+        const timeSinceStart = Date.now() - parseInt(registrationStartTime);
+        const maxProcessingTime = 2 * 60 * 1000; // 2 minutes
+        
+        if (timeSinceStart < maxProcessingTime) {
+          console.log('AuthContext: Registration already in progress for this email (frontend protection)');
+          return {
+            success: false,
+            error: 'Registration is already in progress. Please wait a moment before trying again.',
+            type: 'registration_in_progress'
+          };
+        } else {
+          // Clear expired frontend registration state
+          localStorage.removeItem('currentRegistrationEmail');
+          localStorage.removeItem('registrationStartTime');
+        }
+      }
+      
+      // Set frontend registration state
+      localStorage.setItem('currentRegistrationEmail', userData.email);
+      localStorage.setItem('registrationStartTime', Date.now().toString());
+      
+      // Test backend connectivity first
+      try {
+        await api.get('/health');
+        console.log('AuthContext: Backend connectivity test passed');
+      } catch (healthError) {
+        console.error('AuthContext: Backend connectivity test failed:', healthError);
+        // Clear frontend registration state
+        localStorage.removeItem('currentRegistrationEmail');
+        localStorage.removeItem('registrationStartTime');
+        
+        return {
+          success: false,
+          error: 'Cannot connect to the server. Please check your internet connection and try again.',
+          type: 'backend_unavailable'
+        };
+      }
+      
+      // Make the API call without retry for registration in progress errors
+      let response;
+      try {
+        response = await api.post('/auth/register', userData, {
           timeout: 20000 // 20 seconds timeout for registration
         });
-      });
+      } catch (error) {
+        // Clear frontend registration state on error
+        localStorage.removeItem('currentRegistrationEmail');
+        localStorage.removeItem('registrationStartTime');
+        
+        // If it's a "registration in progress" error, don't retry
+        if (error.response?.data?.message?.includes('Registration already in progress')) {
+          console.log('AuthContext: Backend reports registration in progress, clearing frontend state');
+          return {
+            success: false,
+            error: 'Registration already in progress for this email. Please check your email for OTP or wait a few minutes before trying again.',
+            type: 'registration_in_progress'
+          };
+        }
+        
+        // For other errors, use retry logic
+        response = await retryOperation(async () => {
+          return await api.post('/auth/register', userData, {
+            timeout: 20000
+          });
+        });
+      }
       
       console.log('AuthContext: Registration response:', response.data);
+      
+      // Clear frontend registration state on success
+      localStorage.removeItem('currentRegistrationEmail');
+      localStorage.removeItem('registrationStartTime');
       
       // Registration is successful but user is not created yet
       // Store email for OTP verification
@@ -268,7 +462,9 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Registration error:', error);
       
-      // Clear pending registration on error
+      // Clear all registration state on error
+      localStorage.removeItem('currentRegistrationEmail');
+      localStorage.removeItem('registrationStartTime');
       localStorage.removeItem('pendingRegistrationEmail');
       localStorage.removeItem('registrationTimestamp');
       
@@ -491,7 +687,8 @@ export const AuthProvider = ({ children }) => {
     profilePhoto,
     loadProfilePhoto,
     updateProfilePhoto,
-    updateUser
+    updateUser,
+    testBackendConnection
   };
 
   return (

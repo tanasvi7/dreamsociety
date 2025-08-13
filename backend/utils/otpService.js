@@ -14,14 +14,33 @@ const OTP_CONFIG = {
   MAX_REQUESTS_PER_HOUR: 5
 };
 
-// Gmail transporter configuration
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.GMAIL_USER || 'dileeshsai007@gmail.com',
-    pass: process.env.GMAIL_APP_PASSWORD || 'coan ggfz ypob dqsf'
+// Validate email service configuration
+const validateEmailConfig = () => {
+  const requiredVars = ['GMAIL_USER', 'GMAIL_APP_PASSWORD'];
+  const missing = requiredVars.filter(varName => !process.env[varName]);
+  
+  if (missing.length > 0) {
+    throw new Error(`Missing required email configuration: ${missing.join(', ')}`);
   }
-});
+};
+
+// Gmail transporter configuration
+const createTransporter = () => {
+  validateEmailConfig();
+  
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD
+    },
+    secure: true,
+    port: 465,
+    tls: {
+      rejectUnauthorized: false
+    }
+  });
+};
 
 // Clean up expired OTPs every 5 minutes
 setInterval(() => {
@@ -76,6 +95,7 @@ const sendOTP = async (email) => {
     if (!checkRateLimit(email)) {
       throw new Error('Rate limit exceeded. Please wait before requesting another OTP.');
     }
+    
     const otp = generateOTP();
     const expiresAt = Date.now() + (OTP_CONFIG.EXPIRY_MINUTES * 60 * 1000);
     otpStore.set(email, {
@@ -143,8 +163,9 @@ const sendOTP = async (email) => {
     `;
 
     // Send OTP via Gmail
+    const transporter = createTransporter();
     const mailOptions = {
-      from: `"DreamSociety" <${process.env.GMAIL_USER || 'your-email@gmail.com'}>`,
+      from: `"DreamSociety" <${process.env.GMAIL_USER}>`,
       to: email,
       subject: 'Your DreamSociety Verification Code',
       html: htmlContent,
@@ -157,8 +178,15 @@ const sendOTP = async (email) => {
       console.log(`[OTP SERVICE] Email sent successfully via Gmail`);
     } catch (err) {
       console.error('[OTP SERVICE] Email sending failed:', err.message);
+      
+      // Remove OTP from store if email fails
+      otpStore.delete(email);
+      
       // For development, still log the OTP even if email fails
-      console.log(`[OTP SERVICE] (Email send failed) OTP for ${email}: ${otp}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[OTP SERVICE] (Email send failed) OTP for ${email}: ${otp}`);
+      }
+      
       throw new Error('Failed to send OTP email. Please try again.');
     }
 

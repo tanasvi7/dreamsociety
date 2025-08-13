@@ -9,6 +9,25 @@ import TermsAndConditions from '../common/TermsAndConditions';
 import { apiPost, checkAvailability } from '../../services/apiService';
 import WelcomeHeader from '../welcome/WelcomeHeader';
 
+// Utility function to clear stuck registration state
+const clearStuckRegistrationState = () => {
+  const currentRegistrationEmail = localStorage.getItem('currentRegistrationEmail');
+  const registrationStartTime = localStorage.getItem('registrationStartTime');
+  
+  if (currentRegistrationEmail && registrationStartTime) {
+    const timeSinceStart = Date.now() - parseInt(registrationStartTime);
+    const maxProcessingTime = 2 * 60 * 1000; // 2 minutes
+    
+    if (timeSinceStart > maxProcessingTime) {
+      console.log('Clearing stuck registration state for:', currentRegistrationEmail);
+      localStorage.removeItem('currentRegistrationEmail');
+      localStorage.removeItem('registrationStartTime');
+      return true;
+    }
+  }
+  return false;
+};
+
 const RegisterScreen = () => {
   const [formData, setFormData] = useState({
     name: '',
@@ -30,11 +49,19 @@ const RegisterScreen = () => {
   });
   const [showTerms, setShowTerms] = useState(false);
   const [submitAttempts, setSubmitAttempts] = useState(0);
-  const { register, loading, pendingRegistration } = useAuth();
+  const { register, loading, pendingRegistration, testBackendConnection } = useAuth();
   const navigate = useNavigate();
 
   // State to handle the specific loading animation for OTP sending
   const [isSendingOtp, setIsSendingOtp] = useState(false);
+
+  // Clear stuck registration state on component mount
+  useEffect(() => {
+    const wasCleared = clearStuckRegistrationState();
+    if (wasCleared) {
+      console.log('Stuck registration state cleared on component mount');
+    }
+  }, []);
 
   // Redirect to OTP verification if there's already a pending registration
   useEffect(() => {
@@ -274,7 +301,16 @@ const RegisterScreen = () => {
           } else if (result.type === 'both_exist') {
             setErrors({ email: result.error, phone: result.error });
           } else if (result.type === 'registration_in_progress') {
-            setErrors({ submit: result.error });
+            // Add a manual reset option for registration in progress
+            setErrors({ 
+              submit: `${result.error} Click here to reset and try again.`,
+              showResetOption: true 
+            });
+          } else if (result.type === 'backend_unavailable') {
+            setErrors({ 
+              submit: result.error,
+              showResetOption: true 
+            });
           } else {
             setErrors({ submit: result.error || 'Registration failed. Please try again.' });
           }
@@ -351,6 +387,43 @@ const RegisterScreen = () => {
         delete newErrors[name];
         return newErrors;
       });
+    }
+  };
+
+  // Manual reset function for stuck registration state
+  const handleManualReset = () => {
+    // Clear all registration-related localStorage items
+    localStorage.removeItem('currentRegistrationEmail');
+    localStorage.removeItem('registrationStartTime');
+    localStorage.removeItem('pendingRegistrationEmail');
+    localStorage.removeItem('registrationTimestamp');
+    
+    // Clear form errors
+    setErrors({});
+    
+    // Reset submit attempts
+    setSubmitAttempts(0);
+    
+    console.log('Manual registration reset completed');
+  };
+
+  // Debug function to test backend connectivity
+  const handleDebugBackend = async () => {
+    try {
+      console.log('Testing backend connectivity...');
+      const result = await testBackendConnection();
+      
+      if (result.success) {
+        setErrors({ success: 'Backend is working properly!' });
+      } else {
+        setErrors({ 
+          submit: `Backend test failed: ${result.error}`,
+          debug: result.details 
+        });
+      }
+    } catch (error) {
+      console.error('Debug test error:', error);
+      setErrors({ submit: 'Debug test failed: ' + error.message });
     }
   };
 
@@ -668,6 +741,16 @@ const RegisterScreen = () => {
                 )}
               </button>
               
+              {/* Debug Button (for troubleshooting) */}
+              <button
+                type="button"
+                onClick={handleDebugBackend}
+                className="w-full bg-gray-500 text-white py-2 rounded-lg font-medium hover:bg-gray-600 transition-all duration-300 text-sm"
+                style={{fontFamily: 'Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
+              >
+                Test Backend Connection
+              </button>
+              
               {/* Success Message */}
               {errors.success && (
                 <div className="mt-2 flex items-center space-x-2 p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -680,7 +763,28 @@ const RegisterScreen = () => {
               {errors.submit && (
                 <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
                   <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                  <p className="text-sm text-red-700 font-medium">{errors.submit}</p>
+                  <div className="flex-1">
+                    <p className="text-sm text-red-700 font-medium">{errors.submit}</p>
+                    {/* Show reset button for backend unavailable errors */}
+                    {errors.submit.includes('Cannot connect to the server') && (
+                      <button
+                        type="button"
+                        onClick={handleManualReset}
+                        className="mt-2 text-xs text-blue-600 hover:text-blue-700 underline"
+                      >
+                        Reset and try again
+                      </button>
+                    )}
+                    {/* Show debug information if available */}
+                    {errors.debug && (
+                      <details className="mt-2">
+                        <summary className="text-xs text-gray-600 cursor-pointer">Show debug info</summary>
+                        <pre className="text-xs text-gray-700 mt-1 bg-gray-100 p-2 rounded overflow-auto">
+                          {JSON.stringify(errors.debug, null, 2)}
+                        </pre>
+                      </details>
+                    )}
+                  </div>
                 </div>
               )}
 

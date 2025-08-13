@@ -50,7 +50,7 @@ const AdminBulkUpload = () => {
     formData.append('file', file);
     
     try {
-      const res = await api.post('/bulkUpload/upload/users', formData, {
+      const res = await api.post('/admin/upload/users', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
