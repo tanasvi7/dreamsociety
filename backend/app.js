@@ -83,6 +83,8 @@ const corsOptions = {
       ? [
           'https://dreamssociety.in',
           'https://www.dreamssociety.in',
+          'http://dreamssociety.in',           // Added HTTP version
+          'http://www.dreamssociety.in',       // Added HTTP version
           'https://api.dreamssociety.in',
           'http://103.127.146.54:3000',
           'http://103.127.146.54:5173',

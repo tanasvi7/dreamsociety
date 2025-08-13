@@ -13,10 +13,10 @@ declare module 'axios' {
 // API Configuration - Update this URL for production
 const API_CONFIG = {
   // Development URL (localhost backend)
-  development: 'http://103.127.146.54:3000',
+  development: 'http://localhost:3000',
   
   // Production URL - Update this to your production backend URL
-  production: 'http://103.127.146.54:3000'
+  production: 'http://localhost:3000'
 };
 
 // Force production API (set to true to always use production backend)
@@ -53,22 +53,13 @@ const validateHttps = () => {
 validateHttps();
 
 const api = axios.create({
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
+
   baseURL: getApiUrl(),
   timeout: process.env.NODE_ENV === 'production' ? 30000 : 15000, // 30s timeout for production
   headers: {
     'Content-Type': 'application/json',
     'X-Requested-With': 'XMLHttpRequest'
   }
-=======
-  baseURL: 'http://localhost:3000', // HTTP backend URL
-  timeout: 10000, // 10 seconds timeout
->>>>>>> Stashed changes
-=======
-  baseURL: 'http://localhost:3000', // HTTP backend URL
-  timeout: 10000, // 10 seconds timeout
->>>>>>> Stashed changes
 });
 
 // Add a request interceptor
