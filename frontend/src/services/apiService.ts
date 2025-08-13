@@ -10,13 +10,13 @@ declare module 'axios' {
   }
 }
 
-// API Configuration - Update this URL for production
+// API Configuration - Cleaned up URLs
 const API_CONFIG = {
   // Development URL (localhost backend)
   development: 'http://localhost:3000',
   
-  // Production URL - Update this to your production backend URL
-  production: 'http://localhost:3000'
+  // Production URL (your server IP)
+  production: 'http://103.127.146.54:3000'
 };
 
 // Force production API (set to true to always use production backend)

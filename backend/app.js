@@ -78,26 +78,17 @@ const corsOptions = {
       }
     }
     
-    // Default allowed origins
+    // Default allowed origins - Cleaned up
     const allowedOrigins = process.env.NODE_ENV === 'production' 
       ? [
-          'https://dreamssociety.in',
-          'https://www.dreamssociety.in',
-          'http://dreamssociety.in',           // Added HTTP version
-          'http://www.dreamssociety.in',       // Added HTTP version
-          'https://api.dreamssociety.in',
-          'http://103.127.146.54:3000',
-          'http://103.127.146.54:5173',
-          'http://103.127.146.54:8080'
+          'http://dreamssociety.in',
+          'https://dreamssociety.in'
         ]
 
       : [
           'http://localhost:3000', 
           'http://localhost:5173', 
-          'http://localhost:8080', 
-          'http://127.0.0.1:5173', 
-          'http://127.0.0.1:8080',
-          'http://localhost:4173'
+          'http://127.0.0.1:5173'
         ];
     
     if (allowedOrigins.indexOf(origin) !== -1) {
@@ -208,22 +199,18 @@ app.get('/env-check', (req, res) => {
   });
 });
 
-// CORS debug endpoint
+// CORS debug endpoint - Cleaned up
 app.get('/cors-debug', (req, res) => {
   const origin = req.headers.origin;
   const allowedOrigins = process.env.NODE_ENV === 'production' 
     ? [
-        'https://dreamssociety.in',
-        'https://www.dreamssociety.in',
-        'https://api.dreamssociety.in'
+        'http://dreamssociety.in',
+        'https://dreamssociety.in'
       ]
     : [
         'http://localhost:3000', 
         'http://localhost:5173', 
-        'http://localhost:8080', 
-        'http://127.0.0.1:5173', 
-        'http://127.0.0.1:8080',
-        'http://localhost:4173'
+        'http://127.0.0.1:5173'
       ];
   
   res.json({
