@@ -259,4 +259,4 @@ router.get('/token-info', authenticateJWT, authController.getTokenInfo);
  */
 router.get('/me', authenticateJWT, authController.getMe);
 
-module.exports = router; 
+module.exports = router;

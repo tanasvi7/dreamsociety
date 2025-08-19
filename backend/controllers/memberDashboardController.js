@@ -334,4 +334,173 @@ exports.getMembershipStatus = async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+};
+
+// Get community statistics for member dashboard
+exports.getCommunityStats = async (req, res, next) => {
+  try {
+    // Total members count
+    const totalMembers = await User.count({
+      where: { role: 'member' }
+    });
+
+    // Total jobs posted
+    const totalJobs = await Job.count({
+      where: { status: 'accepted' }
+    });
+
+    // Members by profession (working_type)
+    const membersByProfession = await User.findAll({
+      attributes: [
+        'working_type',
+        [User.sequelize.fn('COUNT', User.sequelize.col('id')), 'count']
+      ],
+      where: { 
+        role: 'member',
+        working_type: { [Op.ne]: null }
+      },
+      group: ['working_type']
+    });
+
+    // Members by district from profile table
+    const membersByDistrict = await Profile.findAll({
+      attributes: [
+        'district',
+        [Profile.sequelize.fn('COUNT', Profile.sequelize.col('user_id')), 'count']
+      ],
+      where: { 
+        district: { 
+          [Op.and]: [
+            { [Op.ne]: null },
+            { [Op.ne]: '' }
+          ]
+        }
+      },
+      group: ['district'],
+      order: [[Profile.sequelize.fn('COUNT', Profile.sequelize.col('user_id')), 'DESC']]
+    });
+
+    // Job statistics
+    const jobsByType = await Job.findAll({
+      attributes: [
+        'job_type',
+        [Job.sequelize.fn('COUNT', Job.sequelize.col('id')), 'count']
+      ],
+      where: { 
+        status: 'accepted',
+        job_type: { [Op.ne]: null }
+      },
+      group: ['job_type']
+    });
+
+    // Recent job postings (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const recentJobs = await Job.count({
+      where: {
+        status: 'accepted',
+        created_at: {
+          [Op.gte]: thirtyDaysAgo
+        }
+      }
+    });
+
+    // Recent member registrations (last 30 days)
+    const recentMembers = await User.count({
+      where: {
+        role: 'member',
+        created_at: {
+          [Op.gte]: thirtyDaysAgo
+        }
+      }
+    });
+
+    res.json({
+      totalMembers,
+      totalJobs,
+      recentJobs,
+      recentMembers,
+      membersByProfession: membersByProfession.map(item => ({
+        profession: item.working_type,
+        count: parseInt(item.dataValues.count)
+      })),
+      membersByDistrict: membersByDistrict.map(item => ({
+        district: item.district,
+        count: parseInt(item.dataValues.count)
+      })),
+      jobsByType: jobsByType.map(item => ({
+        type: item.job_type,
+        count: parseInt(item.dataValues.count)
+      }))
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Get member network statistics
+exports.getNetworkStats = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    
+    // Get user's profile to find location-based connections
+    const userProfile = await Profile.findOne({ where: { user_id: userId } });
+    
+    let locationConnections = 0;
+    let professionConnections = 0;
+    let skillConnections = 0;
+
+    if (userProfile) {
+      // Members from same district
+      if (userProfile.district) {
+        locationConnections = await Profile.count({
+          where: {
+            user_id: { [Op.ne]: userId },
+            district: userProfile.district
+          }
+        });
+      }
+    }
+
+    // Members with same profession
+    const user = await User.findByPk(userId);
+    if (user && user.working_type) {
+      professionConnections = await User.count({
+        where: {
+          id: { [Op.ne]: userId },
+          role: 'member',
+          working_type: user.working_type
+        }
+      });
+    }
+
+    // Members with similar skills
+    const userSkills = await Skill.findAll({
+      where: { user_id: userId },
+      attributes: ['skill_name']
+    });
+
+    if (userSkills.length > 0) {
+      const skillNames = userSkills.map(skill => skill.skill_name);
+      const usersWithSimilarSkills = await Skill.findAll({
+        where: {
+          user_id: { [Op.ne]: userId },
+          skill_name: { [Op.in]: skillNames }
+        },
+        attributes: ['user_id'],
+        group: ['user_id']
+      });
+      skillConnections = usersWithSimilarSkills.length;
+    }
+
+    res.json({
+      locationConnections,
+      professionConnections,
+      skillConnections,
+      totalConnections: locationConnections + professionConnections + skillConnections
+    });
+  } catch (err) {
+    next(err);
+  }
 }; 

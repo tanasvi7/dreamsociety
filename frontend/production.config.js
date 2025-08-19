@@ -6,7 +6,7 @@ export const productionConfig = {
   api: {
     // Update the production URL in apiService.ts to your actual backend domain
     baseURL: 'https://your-production-backend-domain.com', // Update this in apiService.ts
-    timeout: 15000,
+    timeout: 60000, // 60 seconds timeout
     retryAttempts: 3,
     retryDelay: 1000,
   },

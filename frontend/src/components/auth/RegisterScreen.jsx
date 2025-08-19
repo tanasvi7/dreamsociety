@@ -33,6 +33,7 @@ const RegisterScreen = () => {
     name: '',
     email: '',
     phone: '',
+    workingType: '',
     password: '',
     confirmPassword: '',
     acceptTerms: false
@@ -204,6 +205,11 @@ const RegisterScreen = () => {
       newErrors.phone = 'Phone number is already registered. Please try a different phone number.';
     }
 
+    // Working type validation
+    if (!formData.workingType) {
+      newErrors.workingType = 'Please select your working type';
+    }
+
     // Password validation
     if (!formData.password) {
       newErrors.password = 'Password is required';
@@ -261,6 +267,7 @@ const RegisterScreen = () => {
           full_name: formData.name.trim(),
           email: formData.email.toLowerCase().trim(),
           phone: formData.phone.trim(),
+          working_type: formData.workingType,
           password: formData.password
         };
         console.log('Registration payload:', payload);
@@ -599,6 +606,49 @@ const RegisterScreen = () => {
                 )}
               </div>
 
+              {/* Working Type Field */}
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700 mb-2" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
+                  Working Type
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
+                    <User className={`h-5 w-5 ${errors.workingType ? 'text-red-400' : 'text-gray-400'}`} />
+                  </div>
+                  <select
+                    name="workingType"
+                    value={formData.workingType}
+                    onChange={handleChange}
+                    onFocus={handleFocus}
+                    className={`w-full pl-10 pr-4 py-3 border-2 rounded-lg transition-all duration-300 appearance-none bg-white ${
+                      errors.workingType 
+                        ? 'border-red-400 focus:ring-red-200 focus:border-red-500' 
+                        : 'border-gray-300 focus:ring-blue-200 focus:border-blue-500'
+                    }`}
+                    style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
+                    disabled={loading}
+                  >
+                    <option value="">Select your working type</option>
+                    <option value="employee">Employee</option>
+                    <option value="businessman">Businessman</option>
+                    <option value="unemployed">Unemployed</option>
+                    <option value="student">Student</option>
+                  </select>
+                  {/* Dropdown arrow */}
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none z-10">
+                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+                {errors.workingType && (
+                  <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                    <p className="text-sm text-red-700 font-medium">{errors.workingType}</p>
+                  </div>
+                )}
+              </div>
+
               {/* Password Field */}
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-2" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
@@ -824,7 +874,7 @@ const RegisterScreen = () => {
       </div>
 
       {/* Terms and Conditions Modal */}
-      {showTerms && <TermsAndConditions onClose={() => setShowTerms(false)} />}
+      <TermsAndConditions isOpen={showTerms} onClose={() => setShowTerms(false)} />
     </div>
   );
 };

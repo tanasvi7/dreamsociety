@@ -13,7 +13,7 @@ declare module 'axios' {
 // API Configuration - Cleaned up URLs
 const API_CONFIG = {
   // Development URL (localhost backend)
-  development: 'http://localhost:3000',
+  development: 'http://103.127.146.54:3000',
   
   // Production URL (your server IP)
   production: 'http://103.127.146.54:3000'
@@ -55,7 +55,7 @@ validateHttps();
 const api = axios.create({
 
   baseURL: getApiUrl(),
-  timeout: process.env.NODE_ENV === 'production' ? 30000 : 15000, // 30s timeout for production
+  timeout: process.env.NODE_ENV === 'production' ? 60000 : 60000, // 60s timeout for both production and development
   headers: {
     'Content-Type': 'application/json',
     'X-Requested-With': 'XMLHttpRequest'

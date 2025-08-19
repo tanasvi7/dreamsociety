@@ -90,8 +90,8 @@ exports.checkAvailability = async (req, res, next) => {
 
 exports.register = async (req, res, next) => {
   try {
-    const { full_name, email, phone, password } = req.body;
-    console.log('Registration attempt with:', { full_name, email, phone });
+    const { full_name, email, phone, password, working_type } = req.body;
+    console.log('Registration attempt with:', { full_name, email, phone, working_type });
     
     if (!full_name || !email || !phone || !password) {
       throw new ValidationError('All fields are required');
@@ -167,6 +167,7 @@ exports.register = async (req, res, next) => {
       email: normalizedEmail,
       phone: normalizedPhone,
       password_hash,
+      working_type,
       timestamp: Date.now()
     };
     
@@ -352,6 +353,7 @@ exports.verifyOtp = async (req, res, next) => {
         email: registrationData.email,
         phone: registrationData.phone,
         password_hash: registrationData.password_hash,
+        working_type: registrationData.working_type,
         is_verified: true,
         role: 'member',
         is_active: true

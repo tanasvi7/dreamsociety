@@ -52,14 +52,14 @@ const LoginScreen = () => {
     if (error.code === 'ERR_NETWORK' || 
         error.message.includes('Network Error') ||
         error.message.includes('ERR_INTERNET_DISCONNECTED')) {
-      errorMessage = 'No internet connection. Please check your network and try again.';
+      errorMessage = 'No internet connection detected . Please check your network and try again.';
       errorType = 'network';
       showRetry = true;
     }
     // Timeout errors
     else if (error.code === 'ECONNABORTED' || 
              error.message.includes('timeout')) {
-      errorMessage = 'Request timed out. Please check your connection and try again.';
+      errorMessage = 'Request timed out after 1 minute. Please check your connection and try again.';
       errorType = 'timeout';
       showRetry = true;
     }

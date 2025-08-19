@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Users, Briefcase, Star, ArrowRight, Linkedin, Twitter, Facebook, Globe, MessageCircle, Book, Image as LucideImage, Play, Lightbulb, Search } from 'lucide-react';
 import { Carousel, CarouselContent, CarouselItem } from '@/components/ui/carousel';
@@ -16,6 +16,7 @@ import GlobalSearch from '@/components/common/GlobalSearch';
 const WelcomeScreen = () => {
   const isMobile = useIsMobile();
   const [searchOpen, setSearchOpen] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <>
@@ -295,97 +296,58 @@ const WelcomeScreen = () => {
 {/*plans sections*/}
 
 <section className="bg-white py-12 px-6">
-  <div className="max-w-5xl mx-auto text-center">
+  <div className="max-w-4xl mx-auto text-center">
     <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-center mb-8 md:mb-12 text-sky-800 drop-shadow-lg">
       Choose Your Plan
     </h2>
     <p className="text-blue-500 mb-10 text-sky-800 drop-shadow-lg">
-      Unlock your career potential with Dream Society. Pick a subscription that suits your needs.
+      Unlock your career potential with Dream Society. Join our community with our annual membership plan.
     </p>
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div className="flex justify-center">
       
-
-      
-      {/* Free Plan */}
-      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-6 flex flex-col hover:shadow-xl hover:border-blue-300 hover:scale-105 transition-all duration-300 cursor-pointer group">
-        <h3 className="text-xl font-semibold mb-4 group-hover:text-blue-700 transition-colors duration-300">Free</h3>
-        <p className="text-4xl font-bold mb-4 group-hover:text-blue-700 transition-colors duration-300">₹0<span className="text-lg">/mo</span></p>
-        <ul className="text-gray-600 mb-6 space-y-2 text-left">
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Basic profile creation</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Apply to 5 jobs per month</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Basic job search filters</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Community access</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Email support</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✗ Limited profile visibility</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✗ No premium job alerts</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✗ Basic analytics only</li>
-        </ul>
-        <button 
-          onClick={() => {
-            localStorage.setItem('selectedPlan', 'free');
-            window.location.href = 'http://localhost:8080/register';
-          }}
-          className="mt-auto bg-blue-700 hover:bg-blue-800 text-white py-2 px-4 rounded-lg transform hover:scale-105 transition-all duration-300 shadow-md hover:shadow-lg"
-        >
-          Get Started
-        </button>
-      </div>
-
-      {/* Premium Plan */}
-      <div className="bg-white border-2 border-blue-700 rounded-lg shadow-lg p-6 flex flex-col relative hover:shadow-2xl hover:border-blue-800 hover:scale-105 transition-all duration-300 cursor-pointer group">
-        <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-          <span className="bg-blue-700 text-white px-3 py-1 rounded-full text-sm font-medium group-hover:bg-blue-800 transition-colors duration-300">
-            Most Popular
+      {/* Annual Membership Plan */}
+      <div className="bg-white border-2 border-blue-700 rounded-lg shadow-xl p-8 flex flex-col relative hover:shadow-2xl hover:border-blue-800 hover:scale-105 transition-all duration-300 cursor-pointer group max-w-md w-full">
+        <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+          <span className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white px-4 py-2 rounded-full text-sm font-medium group-hover:from-blue-700 group-hover:to-cyan-600 transition-all duration-300 shadow-lg">
+            Recommended
           </span>
         </div>
-        <h3 className="text-xl font-semibold mb-4 group-hover:text-blue-800 transition-colors duration-300">Premium</h3>
-        <p className="text-4xl font-bold mb-4 group-hover:text-blue-800 transition-colors duration-300">₹499<span className="text-lg">/mo</span></p>
-        <ul className="text-gray-600 mb-6 space-y-2 text-left">
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Enhanced profile visibility</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Unlimited job applications</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Advanced search filters</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Priority customer support</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Job application tracking</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Profile analytics</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Direct employer messaging</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Resume builder</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Interview preparation resources</li>
-        </ul>
+        <h3 className="text-2xl font-bold mb-4 group-hover:text-blue-800 transition-colors duration-300">Annual Membership</h3>
+        <p className="text-5xl font-bold mb-2 group-hover:text-blue-800 transition-colors duration-300">₹500</p>
+        <p className="text-lg text-gray-600 mb-6">per year</p>
+        
+        {/* Features List */}
+        <div className="text-left mb-8 space-y-3">
+          <div className="flex items-center">
+            <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
+            <span className="text-gray-700">Full access to community network</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
+            <span className="text-gray-700">Job posting and application features</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
+            <span className="text-gray-700">Skill development resources</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
+            <span className="text-gray-700">Mentorship opportunities</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
+            <span className="text-gray-700">Community events and workshops</span>
+          </div>
+        </div>
+        
         <button 
           onClick={() => {
-            localStorage.setItem('selectedPlan', 'premium');
-            window.location.href = 'http://localhost:8080/register';
+            localStorage.setItem('selectedPlan', 'annual');
+            navigate('/register');
           }}
-          className="mt-auto bg-blue-700 hover:bg-blue-800 text-white py-2 px-4 rounded-lg transform hover:scale-105 transition-all duration-300 shadow-md hover:shadow-lg"
+          className="mt-auto bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white py-3 px-6 rounded-lg transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl font-semibold text-lg"
         >
-          Choose Plan
-        </button>
-      </div>
-
-      {/* Enterprise Plan */}
-      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-6 flex flex-col hover:shadow-xl hover:border-blue-300 hover:scale-105 transition-all duration-300 cursor-pointer group">
-        <h3 className="text-xl font-semibold mb-4 group-hover:text-blue-700 transition-colors duration-300">Enterprise</h3>
-        <p className="text-4xl font-bold mb-4 group-hover:text-blue-700 transition-colors duration-300">₹999<span className="text-lg">/mo</span></p>
-        <ul className="text-gray-600 mb-6 space-y-2 text-left">
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Everything in Premium</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Team collaboration tools</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Advanced analytics dashboard</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Custom branding options</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Dedicated account manager</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ API access</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Bulk user management</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Custom integrations</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ Priority job placement</li>
-          <li className="group-hover:text-gray-800 transition-colors duration-300">✔ White-label solutions</li>
-        </ul>
-        <button 
-          onClick={() => {
-            localStorage.setItem('selectedPlan', 'enterprise');
-            window.location.href = 'http://localhost:8080/register';
-          }}
-          className="mt-auto bg-blue-700 hover:bg-blue-800 text-white py-2 px-4 rounded-lg transform hover:scale-105 transition-all duration-300 shadow-md hover:shadow-lg"
-        >
-          Choose Plan
+          Join Now - ₹500/year
         </button>
       </div>
 

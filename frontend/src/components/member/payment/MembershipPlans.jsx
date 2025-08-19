@@ -16,7 +16,7 @@ import TermsAndConditions from '../../common/TermsAndConditions';
 import { subscriptionService } from '../../../services/subscriptionService';
 
 const MembershipPlans = () => {
-  const [billingCycle, setBillingCycle] = useState('monthly');
+  const [billingCycle, setBillingCycle] = useState('yearly');
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [showQRModal, setShowQRModal] = useState(false);
   const [selectedPlanForQR, setSelectedPlanForQR] = useState(null);
@@ -28,78 +28,25 @@ const MembershipPlans = () => {
 
   const plans = [
     {
-      id: 'free',
-      name: 'Free',
-      price: { monthly: 0, yearly: 0 },
-      icon: Star,
-      color: 'gray',
-      description: 'Perfect for getting started',
-      features: [
-        'Basic profile creation',
-        'Apply to 5 jobs per month',
-        'Basic job search filters',
-        'Community access',
-        'Email support'
-      ],
-      limitations: [
-        'Limited profile visibility',
-        'No premium job alerts',
-        'Basic analytics only'
-      ],
-      popular: false
-    },
-    {
-      id: 'premium',
-      name: 'Premium',
-      price: { monthly: 499, yearly: 4990 },
+      id: 'annual',
+      name: 'Annual Membership',
+      price: { monthly: 500, yearly: 500 },
       icon: Crown,
       color: 'blue',
-      description: 'Most popular choice for professionals',
+      description: 'Complete access to Dream Society community',
       features: [
-        'Enhanced profile visibility',
+        'Full profile creation and management',
         'Unlimited job applications',
-        'Advanced search filters',
-        'Priority customer support',
-        'Job application tracking',
-        'Profile analytics',
-        'Direct employer messaging',
-        'Resume builder',
-        'Interview preparation resources'
+        'Job posting capabilities',
+        'Advanced search and filtering',
+        'Profile analytics and insights',
       ],
       limitations: [],
       popular: true
-    },
-    {
-      id: 'enterprise',
-      name: 'Enterprise',
-      price: { monthly: 999, yearly: 9990 },
-      icon: Zap,
-      color: 'purple',
-      description: 'For teams and organizations',
-      features: [
-        'Everything in Premium',
-        'Team collaboration tools',
-        'Advanced analytics dashboard',
-        'Custom branding options',
-        'Dedicated account manager',
-        'API access',
-        'Bulk user management',
-        'Custom integrations',
-        'Priority job placement',
-        'White-label solutions'
-      ],
-      limitations: [],
-      popular: false
     }
   ];
 
   const handleSelectPlan = async (planId) => {
-    if (planId === 'free') {
-      // Handle free plan - no payment needed
-      setSelectedPlan(planId);
-      return;
-    }
-
     setSelectedPlan(planId);
     setSelectedPlanForQR(planId);
     setShowQRModal(true);
@@ -115,12 +62,12 @@ const MembershipPlans = () => {
     try {
       // Create payment record with transaction details
       const paymentData = {
-        amount: plans.find(p => p.id === selectedPlanForQR)?.price[billingCycle] || 0,
+        amount: 500,
         payment_method: 'upi',
         transaction_number: transactionNumber,
         transaction_type: transactionType,
-        plan_type: selectedPlanForQR,
-        billing_cycle: billingCycle
+        plan_type: 'annual',
+        billing_cycle: 'yearly'
       };
 
       const result = await subscriptionService.createPayment(paymentData);
@@ -187,41 +134,17 @@ const MembershipPlans = () => {
 
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Choose Your Plan</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">Annual Membership</h1>
           <p className="text-xl text-gray-600 mb-8">
-            Unlock your career potential with Dream Society
+            Join Dream Society with our annual membership plan
           </p>
-
-          {/* Billing Toggle */}
-          <div className="flex items-center justify-center space-x-4 bg-white rounded-lg p-2 shadow-lg inline-flex">
-            <button
-              onClick={() => setBillingCycle('monthly')}
-              className={`px-6 py-2 rounded-md font-medium transition-colors ${
-                billingCycle === 'monthly'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:text-blue-600'
-              }`}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => setBillingCycle('yearly')}
-              className={`px-6 py-2 rounded-md font-medium transition-colors relative ${
-                billingCycle === 'yearly'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:text-blue-600'
-              }`}
-            >
-              Yearly
-              <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-                Save 20%
-              </span>
-            </button>
-          </div>
+          <p className="text-lg text-gray-500 mb-8">
+            Get complete access to our community network, job opportunities, and professional development resources
+          </p>
         </div>
 
         {/* Plans Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+        <div className="flex justify-center mb-12">
           {plans.map((plan) => {
             const IconComponent = plan.icon;
             const savings = calculateSavings(plan.price.monthly, plan.price.yearly);
@@ -229,7 +152,7 @@ const MembershipPlans = () => {
             return (
               <div
                 key={plan.id}
-                className={`relative bg-white rounded-2xl shadow-lg border-2 transition-all duration-300 hover:shadow-xl ${
+                className={`relative bg-white rounded-2xl shadow-xl border-2 transition-all duration-300 hover:shadow-2xl max-w-md w-full ${
                   plan.popular 
                     ? 'border-blue-500 transform scale-105' 
                     : selectedPlan === plan.id 
@@ -258,20 +181,16 @@ const MembershipPlans = () => {
                     {/* Price */}
                     <div className="mb-6">
                       <div className="flex items-baseline justify-center">
-                        <span className="text-4xl font-bold text-gray-900">
-                          {formatPrice(plan.price[billingCycle])}
+                        <span className="text-5xl font-bold text-gray-900">
+                          ₹500
                         </span>
-                        {plan.price[billingCycle] > 0 && (
-                          <span className="text-gray-600 ml-2">
-                            /{billingCycle === 'monthly' ? 'month' : 'year'}
-                          </span>
-                        )}
+                        <span className="text-gray-600 ml-2 text-xl">
+                          /year
+                        </span>
                       </div>
-                      {billingCycle === 'yearly' && savings > 0 && (
-                        <p className="text-green-600 text-sm mt-2">
-                          Save {savings}% with yearly billing
-                        </p>
-                      )}
+                      <p className="text-green-600 text-sm mt-2">
+                        Complete access for one full year
+                      </p>
                     </div>
                   </div>
 
@@ -295,15 +214,9 @@ const MembershipPlans = () => {
                   {/* CTA Button */}
                   <button
                     onClick={() => handleSelectPlan(plan.id)}
-                    className={`w-full py-3 px-6 rounded-lg font-semibold transition-all duration-300 ${
-                      plan.id === 'free'
-                        ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        : plan.popular
-                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 shadow-lg'
-                          : 'bg-blue-600 text-white hover:bg-blue-700'
-                    }`}
+                    className="w-full py-4 px-6 rounded-lg font-semibold transition-all duration-300 bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 shadow-lg text-lg"
                   >
-                    {plan.id === 'free' ? 'Get Started' : 'Choose Plan'}
+                    Join Now - ₹500/year
                   </button>
                           {/* Terms and Conditions Section */}
           <div className="text-center">
@@ -320,70 +233,33 @@ const MembershipPlans = () => {
           })}
         </div>
 
-        {/* Features Comparison */}
+        {/* Features Overview */}
         <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Feature Comparison</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">What's Included</h2>
           
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-4 px-6 font-semibold text-gray-900">Features</th>
-                  <th className="text-center py-4 px-6 font-semibold text-gray-900">Free</th>
-                  <th className="text-center py-4 px-6 font-semibold text-gray-900">Premium</th>
-                  <th className="text-center py-4 px-6 font-semibold text-gray-900">Enterprise</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { feature: 'Profile Creation', free: true, premium: true, enterprise: true },
-                  { feature: 'Job Applications', free: '5/month', premium: 'Unlimited', enterprise: 'Unlimited' },
-                  { feature: 'Advanced Search', free: false, premium: true, enterprise: true },
-                  { feature: 'Profile Analytics', free: false, premium: true, enterprise: true },
-                  { feature: 'Priority Support', free: false, premium: true, enterprise: true },
-                  { feature: 'API Access', free: false, premium: false, enterprise: true },
-                  { feature: 'Team Management', free: false, premium: false, enterprise: true },
-                  { feature: 'Custom Branding', free: false, premium: false, enterprise: true },
-                ].map((row, index) => (
-                  <tr key={index} className="border-b border-gray-100">
-                    <td className="py-4 px-6 font-medium text-gray-900">{row.feature}</td>
-                    <td className="py-4 px-6 text-center">
-                      {typeof row.free === 'boolean' ? (
-                        row.free ? (
-                          <Check className="w-5 h-5 text-green-500 mx-auto" />
-                        ) : (
-                          <X className="w-5 h-5 text-red-400 mx-auto" />
-                        )
-                      ) : (
-                        <span className="text-gray-700">{row.free}</span>
-                      )}
-                    </td>
-                    <td className="py-4 px-6 text-center">
-                      {typeof row.premium === 'boolean' ? (
-                        row.premium ? (
-                          <Check className="w-5 h-5 text-green-500 mx-auto" />
-                        ) : (
-                          <X className="w-5 h-5 text-red-400 mx-auto" />
-                        )
-                      ) : (
-                        <span className="text-gray-700">{row.premium}</span>
-                      )}
-                    </td>
-                    <td className="py-4 px-6 text-center">
-                      {typeof row.enterprise === 'boolean' ? (
-                        row.enterprise ? (
-                          <Check className="w-5 h-5 text-green-500 mx-auto" />
-                        ) : (
-                          <X className="w-5 h-5 text-red-400 mx-auto" />
-                        )
-                      ) : (
-                        <span className="text-gray-700">{row.enterprise}</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              { feature: 'Profile Management', description: 'Complete profile creation and customization' },
+              { feature: 'Job Applications', description: 'Unlimited job applications and tracking' },
+              { feature: 'Job Posting', description: 'Post and manage job opportunities' },
+              { feature: 'Advanced Search', description: 'Powerful search and filtering capabilities' },
+              { feature: 'Community Networking', description: 'Connect with professionals and mentors' },
+              { feature: 'Direct Messaging', description: 'Private messaging with community members' },
+              { feature: 'Skill Development', description: 'Access to learning resources and workshops' },
+              { feature: 'Mentorship Program', description: 'Connect with experienced professionals' },
+              { feature: 'Community Events', description: 'Participate in workshops and events' },
+              { feature: 'Profile Analytics', description: 'Track your profile performance and engagement' },
+              { feature: 'Priority Support', description: 'Dedicated customer support assistance' },
+              { feature: 'Resource Pool', description: 'Access to exclusive community resources' },
+            ].map((item, index) => (
+              <div key={index} className="flex items-start space-x-3 p-4 bg-gray-50 rounded-lg">
+                <Check className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h3 className="font-semibold text-gray-900">{item.feature}</h3>
+                  <p className="text-sm text-gray-600">{item.description}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -395,23 +271,23 @@ const MembershipPlans = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-              <h3 className="font-semibold text-gray-900 mb-2">Can I change my plan later?</h3>
-              <p className="text-gray-600">Yes, you can upgrade or downgrade your plan at any time. Changes will be reflected in your next billing cycle.</p>
+              <h3 className="font-semibold text-gray-900 mb-2">What's included in the annual membership?</h3>
+              <p className="text-gray-600">The annual membership includes complete access to all Dream Society features including job posting, networking, skill development resources, and community events for one full year.</p>
             </div>
             
             <div>
-              <h3 className="font-semibold text-gray-900 mb-2">Is there a free trial?</h3>
-              <p className="text-gray-600">We offer a free plan with basic features. You can also try Premium features for 7 days with any paid plan.</p>
+              <h3 className="font-semibold text-gray-900 mb-2">Can I get a refund?</h3>
+              <p className="text-gray-600">We offer a 30-day money-back guarantee. If you're not satisfied with your membership, you can request a full refund within 30 days of purchase.</p>
             </div>
             
             <div>
               <h3 className="font-semibold text-gray-900 mb-2">What payment methods do you accept?</h3>
-              <p className="text-gray-600">We accept all major credit cards, debit cards, UPI, and net banking for Indian users.</p>
+              <p className="text-gray-600">We accept UPI, credit cards, debit cards, and net banking for Indian users. All payments are processed securely.</p>
             </div>
             
             <div>
-              <h3 className="font-semibold text-gray-900 mb-2">Can I cancel anytime?</h3>
-              <p className="text-gray-600">Yes, you can cancel your subscription at any time. You'll continue to have access until the end of your billing period.</p>
+              <h3 className="font-semibold text-gray-900 mb-2">How do I access the community features?</h3>
+              <p className="text-gray-600">Once your payment is confirmed, you'll receive immediate access to all community features including networking, job posting, and skill development resources.</p>
             </div>
           </div>
         </div>
@@ -425,8 +301,7 @@ const MembershipPlans = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-base font-bold">
-                      {selectedPlanForQR === 'free' ? 'Free Plan' : 
-                       selectedPlanForQR === 'premium' ? 'Premium Plan' : 'Enterprise Plan'}
+                      Annual Membership Plan
                     </h3>
                     <p className="text-blue-100 text-xs">Payment QR Code</p>
                   </div>
@@ -445,17 +320,16 @@ const MembershipPlans = () => {
                 <div className="bg-gray-50 rounded-lg p-2 mb-3 text-xs">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Plan:</span>
-                    <span className="font-semibold text-gray-900 capitalize">
-                      {selectedPlanForQR === 'free' ? 'Free' : 
-                       selectedPlanForQR === 'premium' ? 'Premium' : 'Enterprise'}
+                    <span className="font-semibold text-gray-900">
+                      Annual Membership
                     </span>
                   </div>
                   <div className="flex justify-between mt-1">
                     <span className="text-gray-600">Amount:</span>
                     <span className="font-bold text-gray-900">
-                      ₹{plans.find(p => p.id === selectedPlanForQR)?.price[billingCycle].toLocaleString()}
+                      ₹500
                       <span className="text-xs font-normal text-gray-600 ml-1">
-                        /{billingCycle === 'monthly' ? 'month' : 'year'}
+                        /year
                       </span>
                     </span>
                   </div>
@@ -469,6 +343,11 @@ const MembershipPlans = () => {
                       alt="Payment QR Code" 
                       className="w-32 h-32 rounded-lg"
                     />
+                  </div>
+                  {/* UPI ID */}
+                  <div className="mt-2 p-2 bg-gray-50 rounded-md border border-gray-200">
+                    <p className="text-xs text-gray-600 mb-1">UPI ID</p>
+                    <p className="text-sm font-mono font-semibold text-gray-900">9030770968@sbi</p>
                   </div>
                 </div>
 

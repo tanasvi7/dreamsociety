@@ -224,7 +224,7 @@ export const AuthProvider = ({ children }) => {
       
       const response = await retryOperation(async () => {
         return await api.post('/auth/login', credentials, {
-          timeout: 15000 // 15 seconds timeout
+          timeout: 60000 // 60 seconds timeout
         });
       });
       
@@ -554,7 +554,7 @@ export const AuthProvider = ({ children }) => {
       
       const response = await retryOperation(async () => {
         return await api.post('/auth/verify-otp', otpData, {
-          timeout: 15000 // 15 seconds timeout
+          timeout: 60000 // 60 seconds timeout
         });
       });
       
@@ -628,7 +628,7 @@ export const AuthProvider = ({ children }) => {
       
       const response = await retryOperation(async () => {
         return await api.post('/auth/resend-otp', { email }, {
-          timeout: 15000 // 15 seconds timeout
+          timeout: 60000 // 60 seconds timeout
         });
       });
       

@@ -217,4 +217,106 @@ router.get('/analytics', authenticateJWT, memberDashboardController.getMemberAna
  */
 router.get('/membership-status', authenticateJWT, memberDashboardController.getMembershipStatus);
 
+/**
+ * @swagger
+ * /member/dashboard/community-stats:
+ *   get:
+ *     summary: Get community statistics for member dashboard
+ *     tags: [Member Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Community statistics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 totalMembers:
+ *                   type: integer
+ *                   description: Total number of members
+ *                 totalJobs:
+ *                   type: integer
+ *                   description: Total number of accepted jobs
+ *                 recentJobs:
+ *                   type: integer
+ *                   description: Jobs posted in last 30 days
+ *                 recentMembers:
+ *                   type: integer
+ *                   description: Members registered in last 30 days
+ *                 membersByProfession:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       profession:
+ *                         type: string
+ *                       count:
+ *                         type: integer
+ *                 membersByDistrict:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       district:
+ *                         type: string
+ *                       count:
+ *                         type: integer
+ *                 membersByCity:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       city:
+ *                         type: string
+ *                       count:
+ *                         type: integer
+ *                 jobsByType:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       type:
+ *                         type: string
+ *                       count:
+ *                         type: integer
+ *       403:
+ *         description: Forbidden
+ */
+router.get('/community-stats', authenticateJWT, memberDashboardController.getCommunityStats);
+
+/**
+ * @swagger
+ * /member/dashboard/network-stats:
+ *   get:
+ *     summary: Get member network statistics
+ *     tags: [Member Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Network statistics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 locationConnections:
+ *                   type: integer
+ *                   description: Members from same location
+ *                 professionConnections:
+ *                   type: integer
+ *                   description: Members with same profession
+ *                 skillConnections:
+ *                   type: integer
+ *                   description: Members with similar skills
+ *                 totalConnections:
+ *                   type: integer
+ *                   description: Total network connections
+ *       403:
+ *         description: Forbidden
+ */
+router.get('/network-stats', authenticateJWT, memberDashboardController.getNetworkStats);
+
 module.exports = router; 

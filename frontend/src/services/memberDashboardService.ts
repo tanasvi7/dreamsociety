@@ -34,7 +34,31 @@ export interface MemberAnalytics {
   topSkills: string[];
 }
 
+export interface CommunityStats {
+  totalMembers: number;
+  totalJobs: number;
+  recentJobs: number;
+  recentMembers: number;
+  membersByProfession: Array<{
+    profession: string;
+    count: number;
+  }>;
+  membersByDistrict: Array<{
+    district: string;
+    count: number;
+  }>;
+  jobsByType: Array<{
+    type: string;
+    count: number;
+  }>;
+}
 
+export interface NetworkStats {
+  locationConnections: number;
+  professionConnections: number;
+  skillConnections: number;
+  totalConnections: number;
+}
 
 export const memberDashboardService = {
   // Get member dashboard statistics
@@ -67,5 +91,15 @@ export const memberDashboardService = {
     return response.data;
   },
 
+  // Get community statistics
+  getCommunityStats: async (): Promise<CommunityStats> => {
+    const response = await api.get('/member/dashboard/community-stats');
+    return response.data;
+  },
 
+  // Get network statistics
+  getNetworkStats: async (): Promise<NetworkStats> => {
+    const response = await api.get('/member/dashboard/network-stats');
+    return response.data;
+  },
 }; 

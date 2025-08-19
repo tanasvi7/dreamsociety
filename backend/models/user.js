@@ -47,6 +47,10 @@ module.exports = (sequelize) => {
       type: DataTypes.BOOLEAN,
       defaultValue: false
     },
+    working_type: {
+      type: DataTypes.ENUM('employee', 'businessman', 'unemployed', 'student'),
+      allowNull: true
+    },
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW

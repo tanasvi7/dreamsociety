@@ -221,15 +221,6 @@ const GlobalSearch = ({
               </button>
             </form>
             
-            {/* Debug Button - Only show in development */}
-            {process.env.NODE_ENV === 'development' && (
-              <button
-                onClick={handleDebugBackend}
-                className="mt-2 text-xs text-gray-500 hover:text-blue-600 underline"
-              >
-                Debug Backend Connection
-              </button>
-            )}
           </div>
 
           {/* Search Results */}
