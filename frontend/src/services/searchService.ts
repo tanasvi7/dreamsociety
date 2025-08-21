@@ -12,6 +12,7 @@ export interface SearchResult {
   category?: string;
   image?: string;
   url?: string;
+  requiresSubscription?: boolean;
 }
 
 export interface SearchParams {
@@ -120,6 +121,41 @@ class SearchService {
         console.error('🔍 GlobalSearch: Fallback also failed:', fallbackError);
         return [];
       }
+    }
+  }
+
+  /**
+   * Perform public global search for unauthenticated users
+   */
+  async publicGlobalSearch(params: SearchParams): Promise<SearchResult[]> {
+    try {
+      console.log('🔍 PublicGlobalSearch: Starting search with params:', params);
+      
+      // Use the public global search endpoint
+      const response = await api.get('/search/global/public', {
+        params: {
+          query: params.query,
+          type: params.type || 'all',
+          limit: params.limit || 20
+        }
+      });
+      
+      console.log('🔍 PublicGlobalSearch: API Response:', response.data);
+      
+      let results = [];
+      if (response.data && Array.isArray(response.data)) {
+        results = response.data;
+      } else if (response.data && Array.isArray(response.data.results)) {
+        results = response.data.results;
+      } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
+        results = response.data.data;
+      }
+      
+      console.log('🔍 PublicGlobalSearch: Results:', results);
+      return results;
+    } catch (error) {
+      console.error('🔍 PublicGlobalSearch: Error occurred:', error);
+      return [];
     }
   }
 

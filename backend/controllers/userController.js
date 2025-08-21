@@ -40,6 +40,14 @@ exports.getNetworkMemberProfile = async (req, res, next) => {
   try {
     const { id } = req.params;
     
+    // Check subscription status for member profile access
+    if (!req.user.is_subscribed) {
+      return res.status(403).json({ 
+        error: 'Subscription required',
+        message: 'Please subscribe to view member profiles'
+      });
+    }
+    
     // Ensure the requested user is a member (not admin/moderator)
     const user = await User.findByPk(id, { 
       attributes: { exclude: ['password_hash'] },
@@ -108,6 +116,14 @@ exports.updateUserById = async (req, res, next) => {
 
 exports.getAllMembers = async (req, res, next) => {
   try {
+    // Check subscription status for member list access
+    if (!req.user.is_subscribed) {
+      return res.status(403).json({ 
+        error: 'Subscription required',
+        message: 'Please subscribe to view member listings'
+      });
+    }
+    
     const { 
       page = 1, 
       limit = 20, 

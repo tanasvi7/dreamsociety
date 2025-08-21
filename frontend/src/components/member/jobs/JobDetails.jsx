@@ -15,17 +15,20 @@ import {
   CheckCircle,
   Heart,
   Share2,
-  Send
+  Send,
+  Lock
 } from 'lucide-react';
 import { apiGet, apiPost } from '../../../services/apiService';
 import { useAuth } from '../../../contexts/AuthContext';
 import useCustomAlert from '../../../hooks/useCustomAlert';
+import SubscriptionPrompt from '../../common/SubscriptionPrompt';
 
 const JobDetails = () => {
   const { id } = useParams();
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [subscriptionRequired, setSubscriptionRequired] = useState(false);
   const [applying, setApplying] = useState(false);
   const [hasApplied, setHasApplied] = useState(false);
   const { user } = useAuth();
@@ -34,13 +37,21 @@ const JobDetails = () => {
   useEffect(() => {
     const fetchJob = async () => {
       setLoading(true);
+      setError(null);
+      setSubscriptionRequired(false);
       try {
         const res = await apiGet(`/jobs/${id}`);
         setJob(res.data);
         setHasApplied(res.data.hasApplied || false);
-        setError(null);
       } catch (err) {
-        setError('Failed to fetch job details');
+        console.error('Error fetching job details:', err);
+        
+        // Check if it's a subscription required error
+        if (err.response?.status === 403 && err.response?.data?.error === 'Subscription required') {
+          setSubscriptionRequired(true);
+        } else {
+          setError('Failed to fetch job details');
+        }
       } finally {
         setLoading(false);
       }
@@ -77,6 +88,34 @@ const JobDetails = () => {
   };
 
   if (loading) return <div className="max-w-6xl mx-auto px-4 py-8">Loading...</div>;
+  
+  if (subscriptionRequired) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Back Button */}
+        <Link 
+          to="/jobs"
+          className="flex items-center text-gray-600 hover:text-blue-600 mb-6 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5 mr-2" />
+          Back to Jobs
+        </Link>
+        
+        <SubscriptionPrompt 
+          title="Subscribe to View Job Details"
+          description="Get access to view detailed job information and apply for positions"
+          features={[
+            { icon: Briefcase, text: "View job details" },
+            { icon: Send, text: "Apply for jobs" },
+            { icon: Star, text: "Access full descriptions" },
+            { icon: Lock, text: "Premium job access" }
+          ]}
+          className="max-w-md mx-auto"
+        />
+      </div>
+    );
+  }
+  
   if (error) return <div className="max-w-6xl mx-auto px-4 py-8 text-red-600">{error}</div>;
   if (!job) return null;
 

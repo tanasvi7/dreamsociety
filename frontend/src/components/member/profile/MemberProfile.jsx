@@ -14,27 +14,40 @@ import {
   Mail, 
   ArrowLeft,
   User,
-  Home
+  Home,
+  Users,
+  Eye,
+  Lock,
+  Star
 } from 'lucide-react';
 import api from '../../../services/apiService';
+import SubscriptionPrompt from '../../common/SubscriptionPrompt';
 
 const MemberProfile = () => {
   const { id } = useParams();
   const [member, setMember] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [subscriptionRequired, setSubscriptionRequired] = useState(false);
 
   useEffect(() => {
     const fetchMemberProfile = async () => {
       try {
         setLoading(true);
+        setError(null);
+        setSubscriptionRequired(false);
         // Use the network route for member profiles
         const response = await api.get(`/users/network/${id}`);
         setMember(response.data);
-        setError(null);
       } catch (err) {
         console.error('Error fetching member profile:', err);
-        setError('Failed to load member profile. Please try again.');
+        
+        // Check if it's a subscription required error
+        if (err.response?.status === 403 && err.response?.data?.error === 'Subscription required') {
+          setSubscriptionRequired(true);
+        } else {
+          setError('Failed to load member profile. Please try again.');
+        }
       } finally {
         setLoading(false);
       }
@@ -53,6 +66,36 @@ const MemberProfile = () => {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
             <p className="mt-4 text-gray-600">Loading profile...</p>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (subscriptionRequired) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8">
+        <div className="max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="mb-6">
+            <Button asChild variant="ghost" className="mb-4">
+              <Link to="/network">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Network
+              </Link>
+            </Button>
+          </div>
+          
+          <SubscriptionPrompt 
+            title="Subscribe to View Member Profiles"
+            description="Get access to view detailed member profiles and connect with our community"
+            features={[
+              { icon: Users, text: "View member profiles" },
+              { icon: Briefcase, text: "Connect with professionals" },
+              { icon: Star, text: "Access detailed information" },
+              { icon: Lock, text: "Premium network access" }
+            ]}
+            className="max-w-md mx-auto"
+          />
         </div>
       </div>
     );

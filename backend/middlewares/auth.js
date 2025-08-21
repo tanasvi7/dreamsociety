@@ -61,7 +61,8 @@ exports.authenticateJWT = async (req, res, next) => {
       user_id: user.id, // Add this for compatibility with getMe controller
       email: user.email,
       role: user.role,
-      full_name: user.full_name
+      full_name: user.full_name,
+      is_subscribed: user.is_subscribed // Add subscription status
     };
 
     // Add impersonation info if this is an impersonation token

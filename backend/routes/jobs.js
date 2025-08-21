@@ -26,7 +26,7 @@ const jobSchema = Joi.object({
 });
 
 router.get('/', jobController.listJobs);
-router.get('/:id', jobController.getJob);
+router.get('/:id', authenticateJWT, jobController.getJob);
 router.post('/', authenticateJWT, validate(jobSchema), jobController.createJob);
 router.put('/:id', authenticateJWT, validate(jobSchema), jobController.updateJob);
 router.delete('/:id', authenticateJWT, jobController.deleteJob);

@@ -629,7 +629,8 @@ const RegisterScreen = () => {
                     disabled={loading}
                   >
                     <option value="">Select your working type</option>
-                    <option value="employee">Employee</option>
+                    <option value="pvtemployee">Private Employee</option>
+                    <option value="govtemployee">Government Employee</option>                  
                     <option value="businessman">Businessman</option>
                     <option value="unemployed">Unemployed</option>
                     <option value="student">Student</option>

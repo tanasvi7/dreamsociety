@@ -22,6 +22,7 @@ const Network = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [showSubscriptionPrompt, setShowSubscriptionPrompt] = useState(false);
   const { is_subscribed, loading: subscriptionLoading } = useSubscription();
   const { showAlert } = useCustomAlert();
   const [filters, setFilters] = useState({
@@ -58,7 +59,9 @@ const Network = () => {
       if (err.response?.status === 401) {
         setError('Please log in again to view members');
       } else if (err.response?.status === 403) {
-        setError('You do not have permission to view members');
+        // Show subscription prompt instead of error for unsubscribed users
+        setShowSubscriptionPrompt(true);
+        setError(null);
       } else if (err.response?.status >= 500) {
         setError('Server error. Please try again later.');
       } else if (err.message === 'Network Error') {
@@ -157,7 +160,7 @@ const Network = () => {
 
   const handleViewProfile = async (member) => {
     if (!is_subscribed) {
-      showAlert('Please subscribe to view member profiles', 'warning');
+      setShowSubscriptionPrompt(true);
       return;
     }
 
@@ -179,7 +182,7 @@ const Network = () => {
 
   const handleConnect = (member) => {
     if (!is_subscribed) {
-      showAlert('Please subscribe to connect with members', 'warning');
+      setShowSubscriptionPrompt(true);
       return;
     }
     // TODO: Implement connect functionality
@@ -397,6 +400,30 @@ const Network = () => {
                 <p className="text-red-500 text-sm mt-1">Please try refreshing the page or contact support if the problem persists.</p>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Subscription Prompt */}
+        {showSubscriptionPrompt && (
+          <div className="mb-8 relative">
+            <button
+              onClick={() => setShowSubscriptionPrompt(false)}
+              className="absolute top-2 right-2 z-10 p-2 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <SubscriptionPrompt 
+              title="Subscribe to View Member Network"
+              description="Connect with talented professionals and expand your network within our community. Subscribe to unlock full access to member profiles and networking features."
+              features={[
+                { icon: Users, text: "View all member profiles" },
+                { icon: UserPlus, text: "Connect with professionals" },
+                { icon: Eye, text: "Access detailed information" },
+                { icon: Lock, text: "Premium networking features" }
+              ]}
+            />
           </div>
         )}
 

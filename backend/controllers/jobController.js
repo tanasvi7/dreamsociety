@@ -36,6 +36,22 @@ exports.getJob = async (req, res, next) => {
     const job = await Job.findByPk(req.params.id);
     if (!job) throw new NotFoundError('Job not found');
     
+    // Check if user is authenticated and subscribed
+    if (!req.user) {
+      return res.status(401).json({ 
+        error: 'Authentication required',
+        message: 'Please login to view job details'
+      });
+    }
+    
+    // Check subscription status for job details
+    if (!req.user.is_subscribed) {
+      return res.status(403).json({ 
+        error: 'Subscription required',
+        message: 'Please subscribe to view full job details'
+      });
+    }
+    
     // Check if the current user has applied to this job
     let hasApplied = false;
     if (req.user && req.user.role === 'member') {
