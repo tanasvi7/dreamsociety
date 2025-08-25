@@ -251,8 +251,9 @@ const WelcomeHeader = () => {
             style={{ alignItems: 'center' }}>
           
           {/* Logo and Title */}
-          <div
-            className="flex flex-row items-center gap-2 md:gap-4 lg:gap-6 min-w-0 flex-1 md:flex-none md:justify-start"
+          <Link 
+            to="/" 
+            className="flex flex-row items-center gap-2 md:gap-4 lg:gap-6 min-w-0 flex-1 md:flex-none md:justify-start cursor-pointer hover:opacity-90 transition-opacity duration-200"
             style={{ alignItems: 'center' }}
           >
             {/* Logo Image */}
@@ -296,7 +297,7 @@ const WelcomeHeader = () => {
                 non profit organization
               </span>
             </div>
-          </div>
+          </Link>
 
           {/* Desktop Nav & Auth */}
           <div className="hidden md:flex flex-1 items-center justify-between" style={{ alignItems: 'center' }}>
@@ -378,7 +379,7 @@ const WelcomeHeader = () => {
                 className="p-0 w-72 max-w-[85vw] transition-all duration-300 ease-in-out bg-white"
               >
                 <div className="flex flex-col gap-6 p-4 md:p-6 h-full overflow-y-auto">
-                  <div className="flex flex-row items-center gap-3 mb-6">
+                  <Link to="/" onClick={() => setMenuOpen(false)} className="flex flex-row items-center gap-3 mb-6 cursor-pointer hover:opacity-90 transition-opacity duration-200">
                     <div className="logo-container flex items-center justify-center rounded-lg border border-gray-200 shadow-sm" style={{padding:'8px',minWidth:'fit-content'}}>
                       <img
                         src="/partners.png"
@@ -391,7 +392,7 @@ const WelcomeHeader = () => {
                       <span className="brand-text font-bold text-base md:text-lg leading-tight text-gray-800">DREAMS</span>
                       <span className="text-gray-600 text-[10px] md:text-xs font-medium tracking-wide leading-tight" style={{fontFamily:navFont,marginTop:'-1px',maxWidth:'120px'}}>not for profit organization</span>
                     </div>
-                  </div>
+                  </Link>
                   <nav className="flex flex-col gap-3 md:gap-4 flex-1">
                     {navLinks.map((link) => (
                       <NavLink
