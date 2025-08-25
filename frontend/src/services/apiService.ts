@@ -13,10 +13,10 @@ declare module 'axios' {
 // API Configuration - Cleaned up URLs
 const API_CONFIG = {
   // Development URL (localhost backend)
-  development: 'http://125.18.84.107:3000',
+  development: 'https://api.dreamssociety.in',
   
   // Production URL (your server IP)
-  production: 'http://125.18.84.107:3000'
+  production: 'https://api.dreamssociety.in'
 };
 
 // Force production API (set to true to always use production backend)
