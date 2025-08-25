@@ -454,6 +454,13 @@ const LoginScreen = () => {
                   Sign up
                 </Link>
               </div>
+              
+              {/* Add Forgot Password Link */}
+              <div className="text-gray-600" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
+                <Link to="/forgot-password" className="text-blue-600 hover:text-blue-700 font-semibold transition-colors">
+                  Forgot your password?
+                </Link>
+              </div>
             </div>
           </div>
         </div>

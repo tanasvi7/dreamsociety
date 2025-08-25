@@ -317,28 +317,6 @@ const WelcomeScreen = () => {
         <p className="text-lg text-gray-600 mb-6">per year</p>
         
         {/* Features List */}
-        <div className="text-left mb-8 space-y-3">
-          <div className="flex items-center">
-            <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
-            <span className="text-gray-700">Full access to community network</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
-            <span className="text-gray-700">Job posting and application features</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
-            <span className="text-gray-700">Skill development resources</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
-            <span className="text-gray-700">Mentorship opportunities</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
-            <span className="text-gray-700">Community events and workshops</span>
-          </div>
-        </div>
         
         <button 
           onClick={() => {

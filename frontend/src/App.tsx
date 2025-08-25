@@ -37,6 +37,7 @@ import Society from './components/welcome/Society';
 import Contact from './components/welcome/Contact';
 import Policy from './components/welcome/Policy';
 import TermsAndConditions from './components/welcome/TermsAndConditions';
+import ForgotPasswordScreen from './components/auth/ForgotPasswordScreen';
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,7 @@ const App = () => (
               <Route path="/login" element={<LoginScreen />} />
               <Route path="/register" element={<RegisterScreen />} />
               <Route path="/verify-otp" element={<OTPVerification />} />
+              <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
               <Route path="/about" element={<About />} />
               <Route path="/society" element={<Society />} />
               <Route path="/contact" element={<Contact />} />

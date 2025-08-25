@@ -90,7 +90,7 @@ const checkRateLimit = (identifier) => {
   }
 };
 
-const sendOTP = async (email) => {
+const sendOTP = async (email, purpose = 'registration') => {
   try {
     if (!checkRateLimit(email)) {
       throw new Error('Rate limit exceeded. Please wait before requesting another OTP.');
@@ -102,17 +102,30 @@ const sendOTP = async (email) => {
       otp,
       expiresAt,
       attempts: 0,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      purpose // Add purpose to distinguish between registration and forgot password
     });
 
-    // Create HTML email template
+    // Create HTML email template based on purpose
+    const subject = purpose === 'forgot_password' 
+      ? 'Your DreamSociety Password Reset Code'
+      : 'Your DreamSociety Verification Code';
+    
+    const title = purpose === 'forgot_password' 
+      ? 'Password Reset Code'
+      : 'Email Verification Code';
+    
+    const description = purpose === 'forgot_password'
+      ? 'To reset your password, please use the verification code below:'
+      : 'To complete your registration, please use the verification code below:';
+
     const htmlContent = `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>DreamSociety OTP Verification</title>
+        <title>DreamSociety ${title}</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
@@ -128,11 +141,11 @@ const sendOTP = async (email) => {
         <div class="container">
           <div class="header">
             <h1>DreamSociety</h1>
-            <p>Email Verification Code</p>
+            <p>${title}</p>
           </div>
           <div class="content">
             <h2>Hello!</h2>
-            <p>Thank you for registering with DreamSociety. To complete your registration, please use the verification code below:</p>
+            <p>${description}</p>
             
             <div class="otp-code">
               <div class="otp-number">${otp}</div>
@@ -167,14 +180,14 @@ const sendOTP = async (email) => {
     const mailOptions = {
       from: `"DreamSociety" <${process.env.GMAIL_USER}>`,
       to: email,
-      subject: 'Your DreamSociety Verification Code',
+      subject: subject,
       html: htmlContent,
-      text: `Your DreamSociety verification code is: ${otp}\n\nThis code will expire in ${OTP_CONFIG.EXPIRY_MINUTES} minutes.\n\nSecurity Notice:\n- Never share this code with anyone\n- DreamSociety will never ask for this code via phone or email\n- If you didn't request this code, please ignore this email\n\nBest regards,\nThe DreamSociety Team`
+      text: `Your DreamSociety ${title.toLowerCase()} is: ${otp}\n\nThis code will expire in ${OTP_CONFIG.EXPIRY_MINUTES} minutes.\n\nSecurity Notice:\n- Never share this code with anyone\n- DreamSociety will never ask for this code via phone or email\n- If you didn't request this code, please ignore this email\n\nBest regards,\nThe DreamSociety Team`
     };
 
     try {
       await transporter.sendMail(mailOptions);
-      console.log(`[OTP SERVICE] OTP sent to email: ${email} | OTP: ${otp}`);
+      console.log(`[OTP SERVICE] OTP sent to email: ${email} | OTP: ${otp} | Purpose: ${purpose}`);
       console.log(`[OTP SERVICE] Email sent successfully via Gmail`);
     } catch (err) {
       console.error('[OTP SERVICE] Email sending failed:', err.message);
@@ -201,7 +214,7 @@ const sendOTP = async (email) => {
   }
 };
 
-const verifyOTP = async (email, otp) => {
+const verifyOTP = async (email, otp, purpose = 'registration') => {
   try {
     const otpData = otpStore.get(email);
     
@@ -227,12 +240,22 @@ const verifyOTP = async (email, otp) => {
     
     // Check if OTP is correct
     if (otpData.otp === otp) {
-      // Success - delete OTP and return success
-      otpStore.delete(email);
-      return {
-        success: true,
-        message: 'OTP verified successfully'
-      };
+      // For forgot password flow, mark as verified but don't delete yet
+      if (purpose === 'forgot_password') {
+        otpData.verified = true;
+        otpData.verifiedAt = Date.now();
+        return {
+          success: true,
+          message: 'OTP verified successfully'
+        };
+      } else {
+        // For registration flow, delete OTP immediately
+        otpStore.delete(email);
+        return {
+          success: true,
+          message: 'OTP verified successfully'
+        };
+      }
     } else {
       // Invalid OTP
       const remainingAttempts = OTP_CONFIG.MAX_ATTEMPTS - otpData.attempts;
@@ -255,7 +278,7 @@ const verifyOTP = async (email, otp) => {
   }
 };
 
-const resendOTP = async (email) => {
+const resendOTP = async (email, purpose = 'registration') => {
   try {
     // Check if there's an existing OTP
     const existingOtpData = otpStore.get(email);
@@ -275,7 +298,7 @@ const resendOTP = async (email) => {
     }
     
     // Send new OTP
-    return await sendOTP(email);
+    return await sendOTP(email, purpose);
   } catch (error) {
     console.error('[OTP SERVICE] Error resending OTP:', error);
     throw error;
@@ -300,5 +323,6 @@ module.exports = {
   verifyOTP,
   resendOTP,
   getOTPStatus,
-  OTP_CONFIG
+  OTP_CONFIG,
+  otpStore
 }; 

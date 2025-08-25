@@ -2,7 +2,7 @@ const { User } = require('../models');
 const { sequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { sendOTP, verifyOTP, resendOTP } = require('../utils/otpService');
+const { sendOTP, verifyOTP, resendOTP, otpStore } = require('../utils/otpService');
 const { ValidationError, NotFoundError } = require('../middlewares/errorHandler');
 const { Op } = require('sequelize');
 
@@ -583,6 +583,192 @@ exports.clearPendingRegistration = async (req, res, next) => {
     }
   } catch (err) {
     console.error('Clear pending registration error:', err);
+    next(err);
+  }
+};
+
+// Forgot password - send OTP
+exports.forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    console.log('🔐 Forgot password request for:', email);
+    
+    if (!email) {
+      throw new ValidationError('Email is required');
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    // Check if user exists
+    const user = await User.findOne({ where: { email: normalizedEmail } });
+    if (!user) {
+      console.log('❌ User not found for forgot password:', normalizedEmail);
+      return res.status(404).json({
+        error: 'Email not found. Please check your email address.'
+      });
+    }
+
+          // Send OTP for password reset
+      const otpResult = await sendOTP(normalizedEmail, 'forgot_password');
+    
+    console.log('✅ Forgot password OTP sent successfully to:', normalizedEmail);
+    
+    res.json({
+      message: 'Password reset code sent to your email',
+      expiresIn: otpResult.expiresIn
+    });
+  } catch (err) {
+    console.error('❌ Forgot password error:', err);
+    next(err);
+  }
+};
+
+// Verify forgot password OTP
+exports.verifyForgotPasswordOtp = async (req, res, next) => {
+  try {
+    const { email, otp } = req.body;
+    console.log('🔐 Verifying forgot password OTP for:', email);
+    
+    if (!email || !otp) {
+      throw new ValidationError('Email and OTP are required');
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    // Check if user exists
+    const user = await User.findOne({ where: { email: normalizedEmail } });
+    if (!user) {
+      return res.status(404).json({
+        error: 'Email not found. Please check your email address.'
+      });
+    }
+
+          // Verify OTP
+      const otpResult = await verifyOTP(normalizedEmail, otp, 'forgot_password');
+    
+    if (otpResult.success) {
+      console.log('✅ Forgot password OTP verified successfully for:', normalizedEmail);
+      res.json({
+        message: 'OTP verified successfully. You can now reset your password.'
+      });
+    } else {
+      res.status(400).json({
+        error: otpResult.message
+      });
+    }
+  } catch (err) {
+    console.error('❌ Verify forgot password OTP error:', err);
+    next(err);
+  }
+};
+
+// Resend forgot password OTP
+exports.resendForgotPasswordOtp = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    console.log('🔐 Resending forgot password OTP for:', email);
+    
+    if (!email) {
+      throw new ValidationError('Email is required');
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    // Check if user exists
+    const user = await User.findOne({ where: { email: normalizedEmail } });
+    if (!user) {
+      return res.status(404).json({
+        error: 'Email not found. Please check your email address.'
+      });
+    }
+
+          // Resend OTP
+      const otpResult = await resendOTP(normalizedEmail, 'forgot_password');
+    
+    console.log('✅ Forgot password OTP resent successfully to:', normalizedEmail);
+    
+    res.json({
+      message: 'Password reset code resent to your email',
+      expiresIn: otpResult.expiresIn
+    });
+  } catch (err) {
+    console.error('❌ Resend forgot password OTP error:', err);
+    next(err);
+  }
+};
+
+// Reset password
+exports.resetPassword = async (req, res, next) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    console.log('🔐 Resetting password for:', email);
+    
+    if (!email || !otp || !newPassword) {
+      throw new ValidationError('Email, OTP, and new password are required');
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    // Check if user exists
+    const user = await User.findOne({ where: { email: normalizedEmail } });
+    if (!user) {
+      return res.status(404).json({
+        error: 'Email not found. Please check your email address.'
+      });
+    }
+
+          // Check if OTP exists and is verified for forgot password
+      const otpData = otpStore.get(normalizedEmail);
+      
+      if (!otpData) {
+        return res.status(400).json({
+          error: 'OTP not found or expired. Please request a new one.'
+        });
+      }
+      
+      // Check if OTP has expired
+      if (Date.now() > otpData.expiresAt) {
+        otpStore.delete(normalizedEmail);
+        return res.status(400).json({
+          error: 'OTP has expired. Please request a new one.'
+        });
+      }
+      
+      // Check if OTP is verified for forgot password
+      if (!otpData.verified || otpData.purpose !== 'forgot_password') {
+        return res.status(400).json({
+          error: 'Invalid OTP. Please verify your OTP first.'
+        });
+      }
+
+    // Validate password strength
+    if (newPassword.length < 8) {
+      throw new ValidationError('Password must be at least 8 characters long');
+    }
+
+    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(newPassword)) {
+      throw new ValidationError('Password must contain at least one uppercase letter, one lowercase letter, and one number');
+    }
+
+    // Hash the new password
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+    
+          // Update user's password
+      await user.update({
+        password_hash: hashedPassword
+      });
+      
+      // Delete the OTP after successful password reset
+      otpStore.delete(normalizedEmail);
+      
+      console.log('✅ Password reset successfully for:', normalizedEmail);
+      
+      res.json({
+        message: 'Password reset successfully. You can now log in with your new password.'
+      });
+  } catch (err) {
+    console.error('❌ Reset password error:', err);
     next(err);
   }
 };

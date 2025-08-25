@@ -153,6 +153,115 @@ router.post('/verify-otp', otpLimiter, authController.verifyOtp);
  */
 router.post('/resend-otp', otpLimiter, authController.resendOtp);
 
+/**
+ * @swagger
+ * /auth/forgot-password:
+ *   post:
+ *     summary: Send forgot password OTP
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: OTP sent successfully
+ *       404:
+ *         description: Email not found
+ */
+router.post('/forgot-password', otpLimiter, authController.forgotPassword);
+
+/**
+ * @swagger
+ * /auth/verify-forgot-password-otp:
+ *   post:
+ *     summary: Verify forgot password OTP
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - otp
+ *             properties:
+ *               email:
+ *                 type: string
+ *               otp:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: OTP verified successfully
+ *       400:
+ *         description: Invalid OTP
+ */
+router.post('/verify-forgot-password-otp', otpLimiter, authController.verifyForgotPasswordOtp);
+
+/**
+ * @swagger
+ * /auth/resend-forgot-password-otp:
+ *   post:
+ *     summary: Resend forgot password OTP
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: OTP resent successfully
+ *       400:
+ *         description: Invalid request
+ */
+router.post('/resend-forgot-password-otp', otpLimiter, authController.resendForgotPasswordOtp);
+
+/**
+ * @swagger
+ * /auth/reset-password:
+ *   post:
+ *     summary: Reset password with OTP
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - otp
+ *               - newPassword
+ *             properties:
+ *               email:
+ *                 type: string
+ *               otp:
+ *                 type: string
+ *               newPassword:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ *       400:
+ *         description: Invalid request or OTP
+ */
+router.post('/reset-password', authController.resetPassword);
+
 // Test endpoint to check admin user (for debugging)
 router.get('/test-admin', authController.testAdminUser);
 

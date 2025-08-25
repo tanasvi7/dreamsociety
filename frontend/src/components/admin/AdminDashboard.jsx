@@ -7,16 +7,17 @@ import {
   Building,
   TrendingUp,
   TrendingDown,
-  RefreshCw
+  RefreshCw,
+  MapPin,
+  UserCheck,
+  Network
 } from 'lucide-react';
 import { adminDashboardService } from '../../services/adminDashboardService';
+import { memberDashboardService } from '../../services/memberDashboardService';
 import {
   UserRegistrationTrend,
   UserRoleDistribution,
-  UserVerificationStatus,
-  JobStatusDistribution,
-  JobTypeDistribution,
-  TopJobsByApplications
+  UserVerificationStatus
 } from './AdminCharts';
 
 const AdminDashboard = () => {
@@ -24,7 +25,7 @@ const AdminDashboard = () => {
   const [recentUsers, setRecentUsers] = useState([]);
   const [recentJobs, setRecentJobs] = useState([]);
   const [userAnalytics, setUserAnalytics] = useState(null);
-  const [jobAnalytics, setJobAnalytics] = useState(null);
+  const [communityStats, setCommunityStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -39,20 +40,20 @@ const AdminDashboard = () => {
         usersResponse,
         jobsResponse,
         userAnalyticsResponse,
-        jobAnalyticsResponse
+        communityStatsResponse
       ] = await Promise.all([
         adminDashboardService.getDashboardStats(),
         adminDashboardService.getRecentUsers(5),
         adminDashboardService.getRecentJobs(5),
         adminDashboardService.getUserAnalytics(),
-        adminDashboardService.getJobAnalytics()
+        memberDashboardService.getCommunityStats()
       ]);
 
       setStats(statsResponse.stats);
       setRecentUsers(usersResponse.users);
       setRecentJobs(jobsResponse.jobs);
       setUserAnalytics(userAnalyticsResponse);
-      setJobAnalytics(jobAnalyticsResponse);
+      setCommunityStats(communityStatsResponse);
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
       setError('Failed to load dashboard data. Please try again.');
@@ -70,7 +71,10 @@ const AdminDashboard = () => {
       'Users': Users,
       'Briefcase': Briefcase,
       'BarChart3': BarChart3,
-      'Building': Building
+      'Building': Building,
+      'MapPin': MapPin,
+      'UserCheck': UserCheck,
+      'Network': Network
     };
     return iconMap[iconName] || Users;
   };
@@ -154,12 +158,84 @@ const AdminDashboard = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
         <UserVerificationStatus data={userAnalytics?.verificationStatus} />
-        <JobStatusDistribution data={jobAnalytics?.statusDistribution} />
-      </div>
+        
+        {/* Dream Society Community Insights */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-md">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Dream Society Community Insights
+          </h3>
+          <div className="space-y-4">
+            {/* Community Overview */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+                <div className="flex items-center space-x-2">
+                  <Users className="w-5 h-5 text-blue-600" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Total Members</span>
+                </div>
+                <p className="text-2xl font-bold text-blue-600 mt-1">
+                  {communityStats?.totalMembers || 0}
+                </p>
+              </div>
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
+                <div className="flex items-center space-x-2">
+                  <Briefcase className="w-5 h-5 text-green-600" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Total Jobs</span>
+                </div>
+                <p className="text-2xl font-bold text-green-600 mt-1">
+                  {communityStats?.totalJobs || 0}
+                </p>
+              </div>
+            </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
-        <JobTypeDistribution data={jobAnalytics?.typeDistribution} />
-        <TopJobsByApplications data={jobAnalytics?.topJobs} />
+            {/* Top Districts */}
+            <div>
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center">
+                <MapPin className="w-4 h-4 mr-1" />
+                Top Districts
+              </h4>
+              <div className="space-y-2">
+                {communityStats?.membersByDistrict?.slice(0, 5).map((district, index) => (
+                  <div key={index} className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">{district.district}</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">{district.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Top Professions */}
+            <div>
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center">
+                <UserCheck className="w-4 h-4 mr-1" />
+                Top Professions
+              </h4>
+              <div className="space-y-2">
+                {communityStats?.membersByProfession?.slice(0, 5).map((profession, index) => (
+                  <div key={index} className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">{profession.profession}</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">{profession.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Job Types */}
+            <div>
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center">
+                <Network className="w-4 h-4 mr-1" />
+                Job Types
+              </h4>
+              <div className="space-y-2">
+                {communityStats?.jobsByType?.slice(0, 5).map((jobType, index) => (
+                  <div key={index} className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">{jobType.type}</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">{jobType.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Recent Activity */}
