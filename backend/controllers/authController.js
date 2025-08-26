@@ -2,7 +2,7 @@ const { User } = require('../models');
 const { sequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { sendOTP, verifyOTP, resendOTP, otpStore } = require('../utils/otpService');
+const { sendOTP, verifyOTP, resendOTP, getOTPStatus, debugOTPStore, otpStore } = require('../utils/otpService');
 const { ValidationError, NotFoundError } = require('../middlewares/errorHandler');
 const { Op } = require('sequelize');
 
@@ -334,16 +334,17 @@ exports.verifyOtp = async (req, res, next) => {
       throw new ValidationError('Email and OTP are required');
     }
     
-    console.log('OTP verification attempt for email:', email);
+    const normalizedEmail = email.toLowerCase().trim();
+    console.log('OTP verification attempt for email:', normalizedEmail);
     
     // Check if there's a pending registration
-    const registrationData = pendingRegistrations.get(email);
+    const registrationData = pendingRegistrations.get(normalizedEmail);
     if (!registrationData) {
       throw new ValidationError('No pending registration found for this email');
     }
     
-    // Verify OTP
-    const verifyResult = await verifyOTP(email, otp);
+    // Verify OTP with registration purpose
+    const verifyResult = await verifyOTP(normalizedEmail, otp, 'registration');
     if (verifyResult.success) {
       console.log('OTP verified successfully, creating user...');
       
@@ -362,7 +363,7 @@ exports.verifyOtp = async (req, res, next) => {
       console.log('User created successfully with ID:', user.id);
       
       // Remove from pending registrations
-      pendingRegistrations.delete(email);
+      pendingRegistrations.delete(normalizedEmail);
       
       // Generate JWT token with proper claims
       const token = generateJWT(user);
@@ -394,10 +395,11 @@ exports.resendOtp = async (req, res, next) => {
       throw new ValidationError('Email is required');
     }
     
-    console.log('Resend OTP attempt for email:', email);
+    const normalizedEmail = email.toLowerCase().trim();
+    console.log('Resend OTP attempt for email:', normalizedEmail);
     
     // Check if there's a pending registration
-    const registrationData = pendingRegistrations.get(email);
+    const registrationData = pendingRegistrations.get(normalizedEmail);
     if (!registrationData) {
       throw new ValidationError('No pending registration found for this email');
     }
@@ -408,12 +410,12 @@ exports.resendOtp = async (req, res, next) => {
     
     if (timeSinceRegistration > tenMinutes) {
       // Remove expired registration
-      pendingRegistrations.delete(email);
+      pendingRegistrations.delete(normalizedEmail);
       throw new ValidationError('Registration session expired. Please register again.');
     }
     
-    // Resend OTP
-    const otpResult = await resendOTP(email);
+    // Resend OTP with registration purpose
+    const otpResult = await resendOTP(normalizedEmail, 'registration');
     
     console.log('OTP resent successfully');
     
@@ -693,6 +695,28 @@ exports.resendForgotPasswordOtp = async (req, res, next) => {
     });
   } catch (err) {
     console.error('❌ Resend forgot password OTP error:', err);
+    next(err);
+  }
+};
+
+// Debug OTP endpoint (for development only)
+exports.debugOTP = async (req, res, next) => {
+  try {
+    const { email } = req.query;
+    
+    if (process.env.NODE_ENV !== 'development') {
+      return res.status(403).json({ error: 'Debug endpoint only available in development' });
+    }
+    
+    if (email) {
+      const status = getOTPStatus(email);
+      res.json({ email, status });
+    } else {
+      const allOtps = debugOTPStore();
+      res.json({ allOtps });
+    }
+  } catch (err) {
+    console.error('Debug OTP error:', err);
     next(err);
   }
 };

@@ -96,6 +96,13 @@ const sendOTP = async (email, purpose = 'registration') => {
       throw new Error('Rate limit exceeded. Please wait before requesting another OTP.');
     }
     
+    // Clear any existing OTP for this email to prevent conflicts
+    const existingOtp = otpStore.get(email);
+    if (existingOtp) {
+      console.log(`[OTP SERVICE] Clearing existing OTP for email: ${email}, purpose: ${existingOtp.purpose}`);
+      otpStore.delete(email);
+    }
+    
     const otp = generateOTP();
     const expiresAt = Date.now() + (OTP_CONFIG.EXPIRY_MINUTES * 60 * 1000);
     otpStore.set(email, {
@@ -105,6 +112,8 @@ const sendOTP = async (email, purpose = 'registration') => {
       createdAt: Date.now(),
       purpose // Add purpose to distinguish between registration and forgot password
     });
+    
+    console.log(`[OTP SERVICE] Generated new OTP for email: ${email}, purpose: ${purpose}`);
 
     // Create HTML email template based on purpose
     const subject = purpose === 'forgot_password' 
@@ -216,12 +225,16 @@ const sendOTP = async (email, purpose = 'registration') => {
 
 const verifyOTP = async (email, otp, purpose = 'registration') => {
   try {
+    console.log(`[OTP SERVICE] Verifying OTP for email: ${email}, purpose: ${purpose}`);
     const otpData = otpStore.get(email);
     
     // Check if OTP exists
     if (!otpData) {
+      console.log(`[OTP SERVICE] No OTP data found for email: ${email}`);
       throw new Error('OTP not found or expired');
     }
+    
+    console.log(`[OTP SERVICE] Found OTP data for email: ${email}, purpose: ${otpData.purpose}, attempts: ${otpData.attempts}`);
     
     // Check if OTP has expired
     if (Date.now() > otpData.expiresAt) {
@@ -235,11 +248,18 @@ const verifyOTP = async (email, otp, purpose = 'registration') => {
       throw new Error('Maximum verification attempts exceeded. Please request a new OTP.');
     }
     
+    // Check if purpose matches (prevent using registration OTP for forgot password and vice versa)
+    if (otpData.purpose !== purpose) {
+      console.log(`[OTP SERVICE] Purpose mismatch for email: ${email}. Expected: ${purpose}, Found: ${otpData.purpose}`);
+      throw new Error(`Invalid OTP purpose. This OTP was sent for ${otpData.purpose}, not ${purpose}.`);
+    }
+    
     // Increment attempts first
     otpData.attempts++;
     
     // Check if OTP is correct
     if (otpData.otp === otp) {
+      console.log(`[OTP SERVICE] OTP verified successfully for email: ${email}, purpose: ${purpose}`);
       // For forgot password flow, mark as verified but don't delete yet
       if (purpose === 'forgot_password') {
         otpData.verified = true;
@@ -259,9 +279,11 @@ const verifyOTP = async (email, otp, purpose = 'registration') => {
     } else {
       // Invalid OTP
       const remainingAttempts = OTP_CONFIG.MAX_ATTEMPTS - otpData.attempts;
+      console.log(`[OTP SERVICE] Invalid OTP for email: ${email}. Attempts: ${otpData.attempts}, Remaining: ${remainingAttempts}`);
       
       if (remainingAttempts <= 0) {
         // Max attempts reached - delete OTP and throw error
+        console.log(`[OTP SERVICE] Max attempts reached for email: ${email}, deleting OTP`);
         otpStore.delete(email);
         throw new Error('Maximum verification attempts exceeded. Please request a new OTP.');
       } else {
@@ -312,10 +334,28 @@ const getOTPStatus = (email) => {
   }
   return {
     exists: true,
+    purpose: otpData.purpose,
     attempts: otpData.attempts,
     expiresAt: new Date(otpData.expiresAt).toISOString(),
-    isExpired: Date.now() > otpData.expiresAt
+    isExpired: Date.now() > otpData.expiresAt,
+    verified: otpData.verified || false
   };
+};
+
+// Debug function to list all OTPs (for development only)
+const debugOTPStore = () => {
+  const otps = [];
+  for (const [email, data] of otpStore.entries()) {
+    otps.push({
+      email,
+      purpose: data.purpose,
+      attempts: data.attempts,
+      expiresAt: new Date(data.expiresAt).toISOString(),
+      isExpired: Date.now() > data.expiresAt,
+      verified: data.verified || false
+    });
+  }
+  return otps;
 };
 
 module.exports = {
@@ -323,6 +363,7 @@ module.exports = {
   verifyOTP,
   resendOTP,
   getOTPStatus,
+  debugOTPStore,
   OTP_CONFIG,
   otpStore
 }; 

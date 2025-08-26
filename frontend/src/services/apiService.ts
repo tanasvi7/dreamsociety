@@ -9,22 +9,19 @@ declare module 'axios' {
     };
   }
 }
-
 // API Configuration - Cleaned up URLs
 const API_CONFIG = {
   // Development URL (localhost backend)
-  development: 'https://api.dreamssociety.in',
+  development: 'https://api.instatripplan.com',
   
   // Production URL (your server IP)
-  production: 'https://api.dreamssociety.in'
+  production: 'https://api.instatripplan.com'
 };
-
 // Force production API (set to true to always use production backend)
 const FORCE_PRODUCTION_API = true;
-
 // Get API URL based on environment
 const getApiUrl = () => {
-  // If force production is enabled, always use production URL
+// If force production is enabled, always use production URL
   if (FORCE_PRODUCTION_API) {
     console.log('Using production API URL:', API_CONFIG.production);
     return API_CONFIG.production;
@@ -69,15 +66,13 @@ api.interceptors.request.use(
     console.log('API Request:', config.method?.toUpperCase(), config.url);
     console.log('API Base URL:', getApiUrl());
     console.log('Token available:', !!token);
-    console.log('Token value:', token ? token.substring(0, 20) + '...' : 'null');
-    
+    console.log('Token value:', token ? token.substring(0, 20) + '...' : 'null');    
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
       console.log('Authorization header set:', `Bearer ${token.substring(0, 20)}...`);
     } else {
       console.log('No token found, request will be made without authorization');
-    }
-    
+    }    
     // Add request timestamp for debugging
     config.metadata = { startTime: new Date() };
     

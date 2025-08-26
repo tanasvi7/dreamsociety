@@ -262,6 +262,9 @@ router.post('/resend-forgot-password-otp', otpLimiter, authController.resendForg
  */
 router.post('/reset-password', authController.resetPassword);
 
+// Debug OTP endpoint (for development only)
+router.get('/debug-otp', authController.debugOTP);
+
 // Test endpoint to check admin user (for debugging)
 router.get('/test-admin', authController.testAdminUser);
 
