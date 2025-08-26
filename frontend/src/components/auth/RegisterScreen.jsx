@@ -71,138 +71,113 @@ const RegisterScreen = () => {
     }
   }, [pendingRegistration, navigate]);
 
-  // Debounced email and phone availability check
+  // Debounced email and phone availability check - Simplified
   useEffect(() => {
     const checkEmailAvailability = async () => {
-      if (formData.email && /\S+@\S+\.\S+/.test(formData.email)) {
+      if (!formData.email || formData.email.length < 3) {
         setAvailabilityStatus(prev => ({
           ...prev,
-          email: { ...prev.email, checking: true }
+          email: { available: true, checking: false }
         }));
-        try {
-          console.log('🔍 Checking email availability in database:', formData.email);
-          const data = await checkAvailability(formData.email);
-          console.log('📧 Database check result:', data);
-          
-          const isAvailable = data.available && !data.conflicts.includes('email');
-          console.log('📧 Email availability:', isAvailable ? 'AVAILABLE' : 'ALREADY EXISTS');
-          
-          setAvailabilityStatus(prev => ({
-            ...prev,
-            email: { 
-              available: isAvailable,
-              checking: false 
-            }
-          }));
-          
-          // Set error if email is not available
-          if (!data.available && data.conflicts.includes('email')) {
-            console.log('❌ Email validation failed: Already registered in database');
-            setErrors(prev => ({
-              ...prev,
-              email: 'Email address is already registered. Please try a different email address.'
-            }));
-          } else if (errors.email && errors.email.includes('already registered')) {
-            console.log('✅ Email validation passed: Available in database');
-            setErrors(prev => ({
-              ...prev,
-              email: ''
-            }));
+        return;
+      }
+
+      setIsCheckingEmail(true);
+      setAvailabilityStatus(prev => ({
+        ...prev,
+        email: { available: true, checking: true }
+      }));
+
+      try {
+        const result = await checkAvailability(formData.email);
+        setAvailabilityStatus(prev => ({
+          ...prev,
+          email: { 
+            available: result.available && !result.conflicts.includes('email'),
+            checking: false 
           }
-        } catch (error) {
-          console.error('❌ Email availability check error:', error);
-          setAvailabilityStatus(prev => ({
-            ...prev,
-            email: { available: true, checking: false }
-          }));
-        }
+        }));
+      } catch (error) {
+        console.error('Email availability check error:', error);
+        setAvailabilityStatus(prev => ({
+          ...prev,
+          email: { available: true, checking: false }
+        }));
+      } finally {
+        setIsCheckingEmail(false);
       }
     };
 
-    const timeoutId = setTimeout(checkEmailAvailability, 800);
+    const timeoutId = setTimeout(checkEmailAvailability, 500);
     return () => clearTimeout(timeoutId);
-  }, [formData.email, errors.email]);
+  }, [formData.email]);
 
-  // Debounced phone availability check
   useEffect(() => {
     const checkPhoneAvailability = async () => {
-      if (formData.phone && /^\+?[\d\s-()]{10,}$/.test(formData.phone)) {
+      if (!formData.phone || formData.phone.length < 10) {
         setAvailabilityStatus(prev => ({
           ...prev,
-          phone: { ...prev.phone, checking: true }
+          phone: { available: true, checking: false }
         }));
-        try {
-          console.log('🔍 Checking phone availability in database:', formData.phone);
-          const data = await checkAvailability(undefined, formData.phone);
-          console.log('📱 Database check result:', data);
-          
-          const isAvailable = data.available && !data.conflicts.includes('phone');
-          console.log('📱 Phone availability:', isAvailable ? 'AVAILABLE' : 'ALREADY EXISTS');
-          
-          setAvailabilityStatus(prev => ({
-            ...prev,
-            phone: { 
-              available: isAvailable,
-              checking: false 
-            }
-          }));
-          
-          // Set error if phone is not available
-          if (!data.available && data.conflicts.includes('phone')) {
-            console.log('❌ Phone validation failed: Already registered in database');
-            setErrors(prev => ({
-              ...prev,
-              phone: 'Phone number is already registered. Please try a different phone number.'
-            }));
-          } else if (errors.phone && errors.phone.includes('already registered')) {
-            console.log('✅ Phone validation passed: Available in database');
-            setErrors(prev => ({
-              ...prev,
-              phone: ''
-            }));
+        return;
+      }
+
+      setIsCheckingPhone(true);
+      setAvailabilityStatus(prev => ({
+        ...prev,
+        phone: { available: true, checking: true }
+      }));
+
+      try {
+        const result = await checkAvailability(undefined, formData.phone);
+        setAvailabilityStatus(prev => ({
+          ...prev,
+          phone: { 
+            available: result.available && !result.conflicts.includes('phone'),
+            checking: false 
           }
-        } catch (error) {
-          console.error('❌ Phone availability check error:', error);
-          setAvailabilityStatus(prev => ({
-            ...prev,
-            phone: { available: true, checking: false }
-          }));
-        }
+        }));
+      } catch (error) {
+        console.error('Phone availability check error:', error);
+        setAvailabilityStatus(prev => ({
+          ...prev,
+          phone: { available: true, checking: false }
+        }));
+      } finally {
+        setIsCheckingPhone(false);
       }
     };
 
-    const timeoutId = setTimeout(checkPhoneAvailability, 800);
+    const timeoutId = setTimeout(checkPhoneAvailability, 500);
     return () => clearTimeout(timeoutId);
-  }, [formData.phone, errors.phone]);
+  }, [formData.phone]);
 
   const validateForm = () => {
     const newErrors = {};
 
     // Name validation
-    if (!formData.name) {
+    if (!formData.name.trim()) {
       newErrors.name = 'Full name is required';
-    } else if (formData.name.length < 2) {
+    } else if (formData.name.trim().length < 2) {
       newErrors.name = 'Full name must be at least 2 characters';
-    } else if (formData.name.length > 50) {
-      newErrors.name = 'Full name must be less than 50 characters';
     }
 
     // Email validation
     if (!formData.email) {
-      newErrors.email = 'Email address is required';
+      newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Please enter a valid email address';
-    } else if (formData.email && !availabilityStatus.email.checking && !availabilityStatus.email.available) {
-      newErrors.email = 'Email address is already registered. Please try a different email address.';
+    } else if (!availabilityStatus.email.available) {
+      newErrors.email = 'This email is already registered';
     }
 
     // Phone validation
     if (!formData.phone) {
       newErrors.phone = 'Phone number is required';
-    } else if (!/^\+?[\d\s-()]{10,}$/.test(formData.phone)) {
-      newErrors.phone = 'Please enter a valid phone number (minimum 10 digits)';
-    } else if (formData.phone && !availabilityStatus.phone.checking && !availabilityStatus.phone.available) {
-      newErrors.phone = 'Phone number is already registered. Please try a different phone number.';
+    } else if (!/^\+?[\d\s\-\(\)]{10,}$/.test(formData.phone)) {
+      newErrors.phone = 'Please enter a valid phone number';
+    } else if (!availabilityStatus.phone.available) {
+      newErrors.phone = 'This phone number is already registered';
     }
 
     // Working type validation
@@ -213,12 +188,10 @@ const RegisterScreen = () => {
     // Password validation
     if (!formData.password) {
       newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
     } else if (formData.password.length < 8) {
-      newErrors.password = 'Password should be at least 8 characters for better security';
+      newErrors.password = 'Password must be at least 8 characters long';
     } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
-      newErrors.password = 'Password should contain at least one uppercase letter, one lowercase letter, and one number';
+      newErrors.password = 'Password must contain at least one uppercase letter, one lowercase letter, and one number';
     }
 
     // Confirm password validation
@@ -228,29 +201,42 @@ const RegisterScreen = () => {
       newErrors.confirmPassword = 'Passwords do not match';
     }
 
+    // Terms validation
+    if (!formData.acceptTerms) {
+      newErrors.acceptTerms = 'You must accept the terms and conditions';
+    }
+
     // Captcha validation
     if (!captchaValid) {
       newErrors.captcha = 'Please complete the security verification';
     }
 
-    // Terms validation
-    if (!formData.acceptTerms) {
-      newErrors.acceptTerms = 'You must accept the Terms and Conditions to continue';
-    }
-    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+
+    // Clear field-specific error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Prevent multiple submissions
-    if (loading) return;
-    
     // Check submit attempts limit
     if (submitAttempts >= 3) {
-      setErrors({ submit: 'Too many submission attempts. Please wait a few minutes before trying again.' });
+      setErrors({ general: 'Too many failed attempts. Please wait a few minutes before trying again.' });
       return;
     }
     
@@ -299,555 +285,349 @@ const RegisterScreen = () => {
           }, 1000);
         } else {
           console.log('Registration failed:', result.error);
-          
-          // Handle specific error types
-          if (result.type === 'email_exists') {
-            setErrors({ email: result.error });
-          } else if (result.type === 'phone_exists') {
-            setErrors({ phone: result.error });
-          } else if (result.type === 'both_exist') {
-            setErrors({ email: result.error, phone: result.error });
-          } else if (result.type === 'registration_in_progress') {
-            // Add a manual reset option for registration in progress
-            setErrors({ 
-              submit: `${result.error} Click here to reset and try again.`,
-              showResetOption: true 
-            });
-          } else if (result.type === 'backend_unavailable') {
-            setErrors({ 
-              submit: result.error,
-              showResetOption: true 
-            });
-          } else {
-            setErrors({ submit: result.error || 'Registration failed. Please try again.' });
-          }
+          setSubmitAttempts(prev => prev + 1);
+          setErrors({ general: result.error || 'Registration failed. Please try again.' });
         }
       } catch (error) {
         console.error('Registration error:', error);
-        setErrors({ submit: 'Registration failed. Please try again.' });
-      } finally {
-        setIsSendingOtp(false); // End the specific OTP sending loading state
-      }
-    }
-  };
-
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-    
-    // Clear all errors when user starts typing
-    setErrors(prev => {
-      const newErrors = { ...prev };
-      
-      // Clear the specific field error
-      if (newErrors[name]) {
-        delete newErrors[name];
-      }
-      
-      // Clear submit error
-      if (newErrors.submit) {
-        delete newErrors.submit;
-      }
-      
-      // Clear success message
-      if (newErrors.success) {
-        delete newErrors.success;
-      }
-      
-      // Clear captcha error if user is typing in any field
-      if (newErrors.captcha) {
-        delete newErrors.captcha;
-      }
-      
-      // Clear acceptTerms error if user is typing in any field
-      if (newErrors.acceptTerms) {
-        delete newErrors.acceptTerms;
-      }
-      
-      return newErrors;
-    });
-    
-    // Reset availability status when user starts typing in email or phone
-    if (name === 'email' || name === 'phone') {
-      setAvailabilityStatus(prev => ({
-        ...prev,
-        [name]: { available: true, checking: false }
-      }));
-    }
-  };
-
-  const handleTermsClick = (e) => {
-    e.preventDefault();
-    setShowTerms(true);
-  };
-
-  const handleFocus = (e) => {
-    const { name } = e.target;
-    
-    // Clear the specific field error when user focuses on the input
-    if (errors[name]) {
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[name];
-        return newErrors;
-      });
-    }
-  };
-
-  // Manual reset function for stuck registration state
-  const handleManualReset = async () => {
-    try {
-      // Clear all registration-related localStorage items
-      localStorage.removeItem('currentRegistrationEmail');
-      localStorage.removeItem('registrationStartTime');
-      localStorage.removeItem('pendingRegistrationEmail');
-      localStorage.removeItem('registrationTimestamp');
-      
-      // Clear form errors
-      setErrors({});
-      
-      // Reset submit attempts
-      setSubmitAttempts(0);
-      
-      // If we have an email in the form, try to clear the pending registration on the backend
-      if (formData.email) {
-        try {
-          const result = await clearPendingRegistration(formData.email.toLowerCase().trim());
-          console.log('Backend registration cleared:', result.message);
-        } catch (error) {
-          console.log('Error clearing backend registration:', error.message);
-          // Continue with frontend reset even if backend call fails
+        setSubmitAttempts(prev => prev + 1);
+        
+        let errorMessage = 'Registration failed. Please try again.';
+        
+        if (error.response) {
+          const status = error.response.status;
+          const errorData = error.response.data;
+          
+          switch (status) {
+            case 400:
+              errorMessage = errorData?.error || 'Invalid registration data. Please check your information.';
+              break;
+            case 409:
+              errorMessage = 'Email or phone number already exists. Please use different credentials.';
+              break;
+            case 429:
+              errorMessage = 'Too many registration attempts. Please wait a few minutes before trying again.';
+              break;
+            case 500:
+              errorMessage = 'Server error. Please try again later.';
+              break;
+            default:
+              errorMessage = errorData?.error || errorMessage;
+          }
+        } else if (error.code === 'ERR_NETWORK') {
+          errorMessage = 'No internet connection. Please check your network and try again.';
         }
+        
+        setErrors({ general: errorMessage });
+      } finally {
+        setIsSendingOtp(false);
       }
-      
-      console.log('Manual registration reset completed');
-    } catch (error) {
-      console.error('Error during manual reset:', error);
-      // Still clear frontend state even if there's an error
-      setErrors({});
-      setSubmitAttempts(0);
-    }
-  };
-
-  // Debug function to test backend connectivity
-  const handleDebugBackend = async () => {
-    try {
-      console.log('Testing backend connectivity...');
-      const result = await testBackendConnection();
-      
-      if (result.success) {
-        setErrors({ success: 'Backend is working properly!' });
-      } else {
-        setErrors({ 
-          submit: `Backend test failed: ${result.error}`,
-          debug: result.details 
-        });
-      }
-    } catch (error) {
-      console.error('Debug test error:', error);
-      setErrors({ submit: 'Debug test failed: ' + error.message });
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 flex flex-col">
       <WelcomeHeader />
       
-      {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center p-4 relative"
-           style={{
-             backgroundImage: 'linear-gradient(90deg, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.7) 60%, rgba(255,255,255,0.5) 100%), url("back.png")',
-             backgroundPosition: 'center',
-             backgroundRepeat: 'no-repeat',
-             backgroundSize: 'cover',
-           }}>
-        <div className="max-w-md w-full relative z-10">
-          {/* Form Container */}
-          <div className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border border-white/20">
+      <div className="flex-1 flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-md">
+          {/* Back Button */}
+          <div className="mb-6">
+            <Link
+              to="/"
+              className="inline-flex items-center text-gray-600 hover:text-gray-800 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Home
+            </Link>
+          </div>
+
+          {/* Card */}
+          <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+            {/* Header */}
             <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-gray-900 mb-2" style={{fontFamily: 'Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>Create Account</h2>
-              <p className="text-gray-600" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>Join UNITY Nest today</p>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
+                Create Account
+              </h1>
+              <p className="text-gray-600" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
+                Join our community today
+              </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-8">
-              {/* Name Field */}
-              <div className="relative">
+            {/* Success State */}
+            {errors.success && (
+              <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                  <span className="text-green-700 font-medium">{errors.success}</span>
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Full Name Field */}
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
                   Full Name
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
-                    <User className={`h-5 w-5 ${errors.name ? 'text-red-400' : 'text-gray-400'}`} />
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <User className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
                     type="text"
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
-                    onFocus={handleFocus}
-                    className={`w-full pl-10 pr-4 py-3 border-2 rounded-lg transition-all duration-300 ${
-                      errors.name 
-                        ? 'border-red-400 focus:ring-red-200 focus:border-red-500' 
-                        : 'border-gray-300 focus:ring-blue-200 focus:border-blue-500'
-                    }`}
+                    disabled={isSendingOtp}
+                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 ${
+                      errors.name ? 'border-red-500' : 'border-gray-300'
+                    } ${isSendingOtp ? 'opacity-50 cursor-not-allowed' : ''}`}
                     placeholder="Enter your full name"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
-                    disabled={loading}
                   />
+                  {errors.name && (
+                    <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+                  )}
                 </div>
-                {errors.name && (
-                  <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                    <p className="text-sm text-red-700 font-medium">{errors.name}</p>
-                  </div>
-                )}
               </div>
 
               {/* Email Field */}
-              <div className="relative">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
                   Email Address
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
-                    <Mail className={`h-5 w-5 ${errors.email || (formData.email && !availabilityStatus.email.checking && !availabilityStatus.email.available) ? 'text-red-400' : formData.email && !availabilityStatus.email.checking && availabilityStatus.email.available ? 'text-green-400' : 'text-gray-400'}`} />
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Mail className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
                     type="email"
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    onFocus={handleFocus}
-                    className={`w-full pl-10 pr-12 py-3 border-2 rounded-lg transition-all duration-300 ${
-                      errors.email || (formData.email && !availabilityStatus.email.checking && !availabilityStatus.email.available)
-                        ? 'border-red-400 focus:ring-red-200 focus:border-red-500' 
-                        : formData.email && !availabilityStatus.email.checking && availabilityStatus.email.available
-                        ? 'border-green-400 focus:ring-green-200 focus:border-green-500'
-                        : 'border-gray-300 focus:ring-blue-200 focus:border-blue-500'
-                    }`}
+                    disabled={isSendingOtp}
+                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 ${
+                      errors.email ? 'border-red-500' : 'border-gray-300'
+                    } ${isSendingOtp ? 'opacity-50 cursor-not-allowed' : ''}`}
                     placeholder="Enter your email"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
-                    disabled={loading}
                   />
-                  {/* Availability indicator */}
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center z-10">
-                    {availabilityStatus.email.checking && (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                    )}
-                    {!availabilityStatus.email.checking && formData.email && (
-                      <>
-                        {availabilityStatus.email.available ? (
-                          <CheckCircle className="h-5 w-5 text-green-500" />
-                        ) : (
-                          <AlertCircle className="h-5 w-5 text-red-500" />
-                        )}
-                      </>
-                    )}
-                  </div>
+                  {isCheckingEmail && (
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                      <Loader className="w-4 h-4 animate-spin text-blue-500" />
+                    </div>
+                  )}
+                  {errors.email && (
+                    <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+                  )}
+                  {!errors.email && !availabilityStatus.email.available && (
+                    <p className="mt-1 text-sm text-red-600">This email is already registered</p>
+                  )}
                 </div>
-                {errors.email && (
-                  <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                    <p className="text-sm text-red-700 font-medium">{errors.email}</p>
-                  </div>
-                )}
               </div>
 
               {/* Phone Field */}
-              <div className="relative">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
                   Phone Number
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
-                    <Phone className={`h-5 w-5 ${errors.phone || (formData.phone && !availabilityStatus.phone.checking && !availabilityStatus.phone.available) ? 'text-red-400' : formData.phone && !availabilityStatus.phone.checking && availabilityStatus.phone.available ? 'text-green-400' : 'text-gray-400'}`} />
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Phone className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
                     type="tel"
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    onFocus={handleFocus}
-                    className={`w-full pl-10 pr-12 py-3 border-2 rounded-lg transition-all duration-300 ${
-                      errors.phone || (formData.phone && !availabilityStatus.phone.checking && !availabilityStatus.phone.available)
-                        ? 'border-red-400 focus:ring-red-200 focus:border-red-500' 
-                        : formData.phone && !availabilityStatus.phone.checking && availabilityStatus.phone.available
-                        ? 'border-green-400 focus:ring-green-200 focus:border-green-500'
-                        : 'border-gray-300 focus:ring-blue-200 focus:border-blue-500'
-                    }`}
+                    disabled={isSendingOtp}
+                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 ${
+                      errors.phone ? 'border-red-500' : 'border-gray-300'
+                    } ${isSendingOtp ? 'opacity-50 cursor-not-allowed' : ''}`}
                     placeholder="Enter your phone number"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
-                    disabled={loading}
                   />
-                  {/* Availability indicator */}
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center z-10">
-                    {availabilityStatus.phone.checking && (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                    )}
-                    {!availabilityStatus.phone.checking && formData.phone && (
-                      <>
-                        {availabilityStatus.phone.available ? (
-                          <CheckCircle className="h-5 w-5 text-green-500" />
-                        ) : (
-                          <AlertCircle className="h-5 w-5 text-red-500" />
-                        )}
-                      </>
-                    )}
-                  </div>
+                  {isCheckingPhone && (
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                      <Loader className="w-4 h-4 animate-spin text-blue-500" />
+                    </div>
+                  )}
+                  {errors.phone && (
+                    <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+                  )}
+                  {!errors.phone && !availabilityStatus.phone.available && (
+                    <p className="mt-1 text-sm text-red-600">This phone number is already registered</p>
+                  )}
                 </div>
-                {errors.phone && (
-                  <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                    <p className="text-sm text-red-700 font-medium">{errors.phone}</p>
-                  </div>
-                )}
               </div>
 
               {/* Working Type Field */}
-              <div className="relative">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
                   Working Type
                 </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
-                    <User className={`h-5 w-5 ${errors.workingType ? 'text-red-400' : 'text-gray-400'}`} />
-                  </div>
-                  <select
-                    name="workingType"
-                    value={formData.workingType}
-                    onChange={handleChange}
-                    onFocus={handleFocus}
-                    className={`w-full pl-10 pr-4 py-3 border-2 rounded-lg transition-all duration-300 appearance-none bg-white ${
-                      errors.workingType 
-                        ? 'border-red-400 focus:ring-red-200 focus:border-red-500' 
-                        : 'border-gray-300 focus:ring-blue-200 focus:border-blue-500'
-                    }`}
-                    style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
-                    disabled={loading}
-                  >
-                    <option value="">Select your working type</option>
-                    <option value="pvtemployee">Private Employee</option>
-                    <option value="govtemployee">Government Employee</option>                  
-                    <option value="businessman">Businessman</option>
-                    <option value="unemployed">Unemployed</option>
-                    <option value="student">Student</option>
-                  </select>
-                  {/* Dropdown arrow */}
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none z-10">
-                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                </div>
+                <select
+                  name="workingType"
+                  value={formData.workingType}
+                  onChange={handleChange}
+                  disabled={isSendingOtp}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 ${
+                    errors.workingType ? 'border-red-500' : 'border-gray-300'
+                  } ${isSendingOtp ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
+                >
+                  <option value="">Select your working type</option>
+                  <option value="govt employee">Government Employee</option>
+                  <option value="private employee">Private Employee</option>
+                  <option value="businessman">Businessman</option>
+                  <option value="student">Student</option>
+                  <option value="unemployed">Unemployed</option>
+                </select>
                 {errors.workingType && (
-                  <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                    <p className="text-sm text-red-700 font-medium">{errors.workingType}</p>
-                  </div>
+                  <p className="mt-1 text-sm text-red-600">{errors.workingType}</p>
                 )}
               </div>
 
               {/* Password Field */}
-              <div className="relative">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
                   Password
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
-                    <Lock className={`h-5 w-5 ${errors.password ? 'text-red-400' : 'text-gray-400'}`} />
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
                     type={showPassword ? 'text' : 'password'}
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
-                    onFocus={handleFocus}
-                    className={`w-full pl-10 pr-12 py-3 border-2 rounded-lg transition-all duration-300 ${
-                      errors.password 
-                        ? 'border-red-400 focus:ring-red-200 focus:border-red-500' 
-                        : 'border-gray-300 focus:ring-blue-200 focus:border-blue-500'
-                    }`}
+                    disabled={isSendingOtp}
+                    className={`w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 ${
+                      errors.password ? 'border-red-500' : 'border-gray-300'
+                    } ${isSendingOtp ? 'opacity-50 cursor-not-allowed' : ''}`}
                     placeholder="Create a password"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
-                    disabled={loading}
                   />
-                  {/* Eye icon indicator */}
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center z-10">
-                    <button
-                      type="button"
-                      className="hover:text-gray-600 transition-colors"
-                      onClick={() => setShowPassword(!showPassword)}
-                      disabled={loading}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-5 w-5" />
-                      ) : (
-                        <Eye className="h-5 w-5" />
-                      )}
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    disabled={isSendingOtp}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5 text-gray-400" />
+                    ) : (
+                      <Eye className="h-5 w-5 text-gray-400" />
+                    )}
+                  </button>
+                  {errors.password && (
+                    <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+                  )}
                 </div>
-                {errors.password && (
-                  <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                    <p className="text-sm text-red-700 font-medium">{errors.password}</p>
-                  </div>
-                )}
               </div>
 
               {/* Confirm Password Field */}
-              <div className="relative">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
                   Confirm Password
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
-                    <Lock className={`h-5 w-5 ${errors.confirmPassword ? 'text-red-400' : 'text-gray-400'}`} />
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
                     type={showConfirmPassword ? 'text' : 'password'}
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    onFocus={handleFocus}
-                    className={`w-full pl-10 pr-12 py-3 border-2 rounded-lg transition-all duration-300 ${
-                      errors.confirmPassword 
-                        ? 'border-red-400 focus:ring-red-200 focus:border-red-500' 
-                        : 'border-gray-300 focus:ring-blue-200 focus:border-blue-500'
-                    }`}
+                    disabled={isSendingOtp}
+                    className={`w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 ${
+                      errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
+                    } ${isSendingOtp ? 'opacity-50 cursor-not-allowed' : ''}`}
                     placeholder="Confirm your password"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
-                    disabled={loading}
                   />
-                  {/* Eye icon indicator */}
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center z-10">
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    disabled={isSendingOtp}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-5 w-5 text-gray-400" />
+                    ) : (
+                      <Eye className="h-5 w-5 text-gray-400" />
+                    )}
+                  </button>
+                  {errors.confirmPassword && (
+                    <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Terms and Conditions */}
+              <div className="flex items-start space-x-3">
+                <input
+                  type="checkbox"
+                  name="acceptTerms"
+                  checked={formData.acceptTerms}
+                  onChange={handleChange}
+                  disabled={isSendingOtp}
+                  className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <div className="flex-1">
+                  <label className="text-sm text-gray-700" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
+                    I agree to the{' '}
                     <button
                       type="button"
-                      className="hover:text-gray-600 transition-colors"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      disabled={loading}
+                      onClick={() => setShowTerms(true)}
+                      className="text-blue-600 hover:text-blue-700 font-medium"
                     >
-                      {showConfirmPassword ? (
-                        <EyeOff className="h-5 w-5" />
-                      ) : (
-                        <Eye className="h-5 w-5" />
-                      )}
+                      Terms and Conditions
                     </button>
-                  </div>
+                  </label>
+                  {errors.acceptTerms && (
+                    <p className="mt-1 text-sm text-red-600">{errors.acceptTerms}</p>
+                  )}
                 </div>
-                {errors.confirmPassword && (
-                  <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                    <p className="text-sm text-red-700 font-medium">{errors.confirmPassword}</p>
-                  </div>
-                )}
               </div>
 
               {/* Captcha Field */}
-              <div className="relative">
+              <div className={isSendingOtp ? 'opacity-50 pointer-events-none' : ''}>
                 <Captcha onValidationChange={setCaptchaValid} />
-                {errors.captcha && (
-                  <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                    <p className="text-sm text-red-700 font-medium">{errors.captcha}</p>
-                  </div>
-                )}
               </div>
+              {errors.captcha && (
+                <p className="mt-1 text-sm text-red-600">{errors.captcha}</p>
+              )}
 
-              {/* Terms and Conditions Checkbox */}
-              <div className="relative">
-                <div className="flex items-start space-x-3">
-                  <input
-                    type="checkbox"
-                    name="acceptTerms"
-                    checked={formData.acceptTerms}
-                    onChange={handleChange}
-                    onFocus={handleFocus}
-                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    disabled={loading}
-                  />
-                  <div className="flex-1">
-                    <label className="text-sm text-gray-700" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
-                      I agree to the{' '}
-                      <button
-                        type="button"
-                        onClick={handleTermsClick}
-                        className="text-blue-600 hover:text-blue-700 underline font-medium"
-                        style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
-                        disabled={loading}
-                      >
-                        Terms and Conditions
-                      </button>
-                      {' '}of UNITY Nest
-                    </label>
+              {/* Error Display */}
+              {errors.general && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                    <p className="text-red-700 text-sm">{errors.general}</p>
                   </div>
                 </div>
-                {errors.acceptTerms && (
-                  <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                    <p className="text-sm text-red-700 font-medium">{errors.acceptTerms}</p>
-                  </div>
-                )}
-              </div>
+              )}
 
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={loading || isSendingOtp}
-                className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-4 rounded-xl font-semibold hover:from-blue-700 hover:to-cyan-600 hover:scale-105 transition-all duration-300 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
-                style={{fontFamily: 'Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
+                disabled={isSendingOtp || !captchaValid}
+                className="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-cyan-600 transition-all duration-300 flex items-center justify-center shadow-lg disabled:opacity-75 disabled:cursor-not-allowed"
+                style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
               >
                 {isSendingOtp ? (
-                  <div className="flex items-center space-x-2">
-                    <Loader className="w-5 h-5 animate-spin" />
-                    <span>Sending OTP...</span>
-                  </div>
+                  <>
+                    <Loader className="w-5 h-5 animate-spin mr-2" />
+                    Creating Account...
+                  </>
                 ) : (
                   'Create Account'
                 )}
               </button>
-              
-              
-              {/* Success Message */}
-              {errors.success && (
-                <div className="mt-2 flex items-center space-x-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                  <p className="text-sm text-green-700 font-medium">{errors.success}</p>
-                </div>
-              )}
-              
-              {/* Submit Error */}
-              {errors.submit && (
-                <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm text-red-700 font-medium">{errors.submit}</p>
-                    {/* Show reset button for backend unavailable errors or registration in progress */}
-                    {(errors.submit.includes('Cannot connect to the server') || 
-                      errors.submit.includes('Registration already in progress')) && (
-                      <button
-                        type="button"
-                        onClick={handleManualReset}
-                        className="mt-2 text-xs text-blue-600 hover:text-blue-700 underline"
-                      >
-                        Reset and try again
-                      </button>
-                    )}
-                    {/* Show debug information if available */}
-                    {errors.debug && (
-                      <details className="mt-2">
-                        <summary className="text-xs text-gray-600 cursor-pointer">Show debug info</summary>
-                        <pre className="text-xs text-gray-700 mt-1 bg-gray-100 p-2 rounded overflow-auto">
-                          {JSON.stringify(errors.debug, null, 2)}
-                        </pre>
-                      </details>
-                    )}
-                  </div>
-                </div>
-              )}
 
               {/* Submit Attempts Warning */}
               {submitAttempts >= 2 && (

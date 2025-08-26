@@ -48,7 +48,7 @@ module.exports = (sequelize) => {
       defaultValue: false
     },
     working_type: {
-      type: DataTypes.ENUM('employee', 'businessman', 'unemployed', 'student'),
+      type: DataTypes.ENUM('govt employee', 'private employee', 'unemployed', 'businessman', 'student'),
       allowNull: true
     },
     created_at: {

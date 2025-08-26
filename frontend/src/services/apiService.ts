@@ -9,6 +9,7 @@ declare module 'axios' {
     };
   }
 }
+
 // API Configuration - Cleaned up URLs
 const API_CONFIG = {
   // Development URL (localhost backend)
@@ -17,8 +18,10 @@ const API_CONFIG = {
   // Production URL (your server IP)
   production: 'https://api.instatripplan.com'
 };
+
 // Force production API (set to true to always use production backend)
 const FORCE_PRODUCTION_API = true;
+
 // Get API URL based on environment
 const getApiUrl = () => {
 // If force production is enabled, always use production URL
@@ -49,8 +52,62 @@ const validateHttps = () => {
 // Initialize HTTPS validation
 validateHttps();
 
-const api = axios.create({
+// Retry configuration
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  baseDelay: 1000, // 1 second
+  maxDelay: 10000, // 10 seconds
+  retryableStatuses: [429, 500, 502, 503, 504],
+  retryableErrors: ['ERR_NETWORK', 'ECONNABORTED']
+};
 
+// Exponential backoff delay
+const getRetryDelay = (attempt: number): number => {
+  const delay = RETRY_CONFIG.baseDelay * Math.pow(2, attempt);
+  return Math.min(delay, RETRY_CONFIG.maxDelay);
+};
+
+// Check if error is retryable
+const isRetryableError = (error: any): boolean => {
+  if (error.response) {
+    return RETRY_CONFIG.retryableStatuses.includes(error.response.status);
+  }
+  return RETRY_CONFIG.retryableErrors.includes(error.code);
+};
+
+// Retry wrapper function
+const withRetry = async <T>(operation: () => Promise<T>, maxRetries = RETRY_CONFIG.maxRetries): Promise<T> => {
+  let lastError: any;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      lastError = error;
+      
+      // Don't retry if it's the last attempt or if error is not retryable
+      if (attempt === maxRetries || !isRetryableError(error)) {
+        throw error;
+      }
+      
+      // Don't retry rate limit errors immediately
+      if (error.response?.status === 429) {
+        const retryAfter = error.response.headers['retry-after'];
+        const delay = retryAfter ? parseInt(retryAfter) * 1000 : getRetryDelay(attempt);
+        console.log(`Rate limited. Waiting ${delay}ms before retry ${attempt + 1}/${maxRetries + 1}`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        const delay = getRetryDelay(attempt);
+        console.log(`Request failed. Retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries + 1})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw lastError;
+};
+
+const api = axios.create({
   baseURL: getApiUrl(),
   timeout: process.env.NODE_ENV === 'production' ? 60000 : 60000, // 60s timeout for both production and development
   headers: {
@@ -126,6 +183,11 @@ api.interceptors.response.use(
         console.error('Access forbidden - insufficient permissions');
       } else if (error.response.status === 429) {
         console.error('Rate limit exceeded');
+        // Add retry-after header information
+        const retryAfter = error.response.headers['retry-after'];
+        if (retryAfter) {
+          console.log(`Rate limit retry-after: ${retryAfter} seconds`);
+        }
       }
     } else if (error.request) {
       console.error('No response received from server');
@@ -135,6 +197,15 @@ api.interceptors.response.use(
   }
 );
 
+// Enhanced API methods with retry logic
+const apiWithRetry = {
+  get: (url: string, config?: any) => withRetry(() => api.get(url, config)),
+  post: (url: string, data?: any, config?: any) => withRetry(() => api.post(url, data, config)),
+  put: (url: string, data?: any, config?: any) => withRetry(() => api.put(url, data, config)),
+  delete: (url: string, config?: any) => withRetry(() => api.delete(url, config)),
+  patch: (url: string, data?: any, config?: any) => withRetry(() => api.patch(url, data, config))
+};
+
 // Check availability function with retry logic
 export const checkAvailability = async (email?: string, phone?: string, retries = 2) => {
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -143,7 +214,7 @@ export const checkAvailability = async (email?: string, phone?: string, retries 
       if (email) params.append('email', email);
       if (phone) params.append('phone', phone);
       
-      const response = await api.get(`/auth/check-availability?${params.toString()}`);
+      const response = await apiWithRetry.get(`/auth/check-availability?${params.toString()}`);
       return response.data;
     } catch (error) {
       console.error(`Availability check error (attempt ${attempt + 1}):`, error);
@@ -162,7 +233,7 @@ export const checkAvailability = async (email?: string, phone?: string, retries 
 // Clear pending registration
 export const clearPendingRegistration = async (email: string) => {
   try {
-    const response = await api.post('/auth/clear-pending-registration', { email });
+    const response = await apiWithRetry.post('/auth/clear-pending-registration', { email });
     return response.data;
   } catch (error) {
     console.error('Error clearing pending registration:', error);
@@ -213,9 +284,9 @@ export const secureTokenStorage = {
   }
 };
 
-export default api;
+export default apiWithRetry;
 
-export const apiPost = (...args: Parameters<typeof api.post>) => api.post(...args);
-export const apiGet = (...args: Parameters<typeof api.get>) => api.get(...args);
-export const apiPut = (...args: Parameters<typeof api.put>) => api.put(...args);
-export const apiDelete = (...args: Parameters<typeof api.delete>) => api.delete(...args);
+export const apiPost = (...args: Parameters<typeof apiWithRetry.post>) => apiWithRetry.post(...args);
+export const apiGet = (...args: Parameters<typeof apiWithRetry.get>) => apiWithRetry.get(...args);
+export const apiPut = (...args: Parameters<typeof apiWithRetry.put>) => apiWithRetry.put(...args);
+export const apiDelete = (...args: Parameters<typeof apiWithRetry.delete>) => apiWithRetry.delete(...args);

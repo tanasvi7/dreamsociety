@@ -5,14 +5,12 @@ const rateLimit = require('express-rate-limit');
 // In production: Stricter rate limits for security
 const isDevelopment = process.env.NODE_ENV === 'development';
 
-// Rate limiting for login attempts
+// Rate limiting for login attempts - UNLIMITED
 const loginLimiter = rateLimit({
-  windowMs: isDevelopment ? 1 * 60 * 1000 : 15 * 60 * 1000, // 1 minute in dev, 15 minutes in production
-  max: isDevelopment ? 30 : 5, // 30 attempts per minute in dev, 5 per 15 minutes in production
+  windowMs: 1 * 60 * 1000, // 1 minute window
+  max: 1000, // Allow 1000 requests per minute (effectively unlimited)
   message: {
-    error: isDevelopment 
-      ? 'Too many login attempts. Please wait 1 minute before trying again.'
-      : 'Too many login attempts. Please wait 15 minutes before trying again.',
+    error: 'Too many login attempts. Please try again later.',
     type: 'rate_limit',
     code: 'LOGIN_RATE_LIMIT_EXCEEDED'
   },
@@ -20,9 +18,7 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
   handler: (req, res) => {
     res.status(429).json({
-      error: isDevelopment 
-        ? 'Too many login attempts. Please wait 1 minute before trying again.'
-        : 'Too many login attempts. Please wait 15 minutes before trying again.',
+      error: 'Too many login attempts. Please try again later.',
       type: 'rate_limit',
       code: 'LOGIN_RATE_LIMIT_EXCEEDED'
     });
@@ -33,14 +29,12 @@ const loginLimiter = rateLimit({
   }
 });
 
-// Rate limiting for registration attempts
+// Rate limiting for registration attempts - UNLIMITED
 const registrationLimiter = rateLimit({
-  windowMs: isDevelopment ? 1 * 60 * 1000 : 15 * 60 * 1000, // 1 minute in dev, 15 minutes in production
-  max: isDevelopment ? 50 : 10, // 50 attempts per minute in dev, 10 per 15 minutes in production
+  windowMs: 1 * 60 * 1000, // 1 minute window
+  max: 1000, // Allow 1000 requests per minute (effectively unlimited)
   message: {
-    error: isDevelopment 
-      ? 'Too many registration attempts. Please wait 1 minute before trying again.'
-      : 'Too many registration attempts. Please wait 15 minutes before trying again.',
+    error: 'Too many registration attempts. Please try again later.',
     type: 'rate_limit',
     code: 'REGISTRATION_RATE_LIMIT_EXCEEDED'
   },
@@ -48,9 +42,7 @@ const registrationLimiter = rateLimit({
   legacyHeaders: false,
   handler: (req, res) => {
     res.status(429).json({
-      error: isDevelopment 
-        ? 'Too many registration attempts. Please wait 1 minute before trying again.'
-        : 'Too many registration attempts. Please wait 15 minutes before trying again.',
+      error: 'Too many registration attempts. Please try again later.',
       type: 'rate_limit',
       code: 'REGISTRATION_RATE_LIMIT_EXCEEDED'
     });
@@ -61,14 +53,12 @@ const registrationLimiter = rateLimit({
   }
 });
 
-// Rate limiting for OTP requests
+// Rate limiting for OTP requests - UNLIMITED
 const otpLimiter = rateLimit({
-  windowMs: isDevelopment ? 1 * 60 * 1000 : 5 * 60 * 1000, // 1 minute in dev, 5 minutes in production
-  max: isDevelopment ? 20 : 3, // 20 attempts per minute in dev, 3 per 5 minutes in production
+  windowMs: 1 * 60 * 1000, // 1 minute window
+  max: 1000, // Allow 1000 requests per minute (effectively unlimited)
   message: {
-    error: isDevelopment 
-      ? 'Too many OTP requests. Please wait 1 minute before trying again.'
-      : 'Too many OTP requests. Please wait 5 minutes before trying again.',
+    error: 'Too many OTP requests. Please try again later.',
     type: 'rate_limit',
     code: 'OTP_RATE_LIMIT_EXCEEDED'
   },
@@ -76,9 +66,7 @@ const otpLimiter = rateLimit({
   legacyHeaders: false,
   handler: (req, res) => {
     res.status(429).json({
-      error: isDevelopment 
-        ? 'Too many OTP requests. Please wait 1 minute before trying again.'
-        : 'Too many OTP requests. Please wait 5 minutes before trying again.',
+      error: 'Too many OTP requests. Please try again later.',
       type: 'rate_limit',
       code: 'OTP_RATE_LIMIT_EXCEEDED'
     });
@@ -90,10 +78,10 @@ const otpLimiter = rateLimit({
   }
 });
 
-// General API rate limiting
+// General API rate limiting - More lenient
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isDevelopment ? 1000 : 100, // 1000 requests per 15 minutes in dev, 100 in production
+  max: isDevelopment ? 2000 : 500, // 2000 requests per 15 minutes in dev, 500 in production
   message: {
     error: 'Too many requests. Please try again later.',
     type: 'rate_limit',
@@ -117,7 +105,7 @@ const apiLimiter = rateLimit({
 // Admin API rate limiting (stricter)
 const adminLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isDevelopment ? 500 : 50, // 500 requests per 15 minutes in dev, 50 in production
+  max: isDevelopment ? 1000 : 100, // 1000 requests per 15 minutes in dev, 100 in production
   message: {
     error: 'Too many admin requests. Please try again later.',
     type: 'rate_limit',

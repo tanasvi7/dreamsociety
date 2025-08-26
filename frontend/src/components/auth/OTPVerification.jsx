@@ -112,7 +112,18 @@ const OTPVerification = () => {
         const pendingSearchContext = localStorage.getItem('pendingSearchContext');
         const pendingPreviewContext = localStorage.getItem('pendingPreviewContext');
         
+        // Determine redirect path based on user role
         let redirectPath = '/dashboard';
+        
+        // Check if user is admin and redirect to admin dashboard
+        if (result.user && result.user.role === 'admin') {
+          console.log('OTPVerification: User is admin, redirecting to admin dashboard');
+          redirectPath = '/admin/dashboard';
+        } else {
+          console.log('OTPVerification: User is regular member, redirecting to member dashboard');
+          redirectPath = '/dashboard';
+        }
+        
         let shouldClearContext = false;
         
         if (pendingSearchContext) {
@@ -123,7 +134,7 @@ const OTPVerification = () => {
             // Only use context if it's less than 5 minutes old
             if (contextAge < 5 * 60 * 1000) {
               console.log('OTPVerification: Found search context, will redirect to search results');
-              redirectPath = '/dashboard';
+              // Keep the role-based redirect path
               shouldClearContext = true;
             } else {
               console.log('OTPVerification: Search context expired, clearing');
@@ -141,7 +152,7 @@ const OTPVerification = () => {
             // Only use context if it's less than 5 minutes old
             if (contextAge < 5 * 60 * 1000) {
               console.log('OTPVerification: Found preview context, will redirect to appropriate section');
-              redirectPath = '/dashboard';
+              // Keep the role-based redirect path
               shouldClearContext = true;
             } else {
               console.log('OTPVerification: Preview context expired, clearing');

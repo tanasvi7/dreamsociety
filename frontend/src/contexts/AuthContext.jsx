@@ -222,10 +222,9 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('AuthContext: Attempting login with credentials:', credentials);
       
-      const response = await retryOperation(async () => {
-        return await api.post('/auth/login', credentials, {
-          timeout: 60000 // 60 seconds timeout
-        });
+      // Direct API call - no retry for authentication (400 errors should not be retried)
+      const response = await api.post('/auth/login', credentials, {
+        timeout: 60000 // 60 seconds timeout
       });
       
       console.log('AuthContext: Login response:', response.data);
@@ -552,10 +551,9 @@ export const AuthProvider = ({ children }) => {
         }
       }
       
-      const response = await retryOperation(async () => {
-        return await api.post('/auth/verify-otp', otpData, {
-          timeout: 60000 // 60 seconds timeout
-        });
+      // Direct API call - no retry for OTP verification (400 errors should not be retried)
+      const response = await api.post('/auth/verify-otp', otpData, {
+        timeout: 60000 // 60 seconds timeout
       });
       
       console.log('AuthContext: OTP verification response:', response.data);
@@ -626,10 +624,9 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('AuthContext: Resending OTP');
       
-      const response = await retryOperation(async () => {
-        return await api.post('/auth/resend-otp', { email }, {
-          timeout: 60000 // 60 seconds timeout
-        });
+      // Direct API call - no retry for OTP resend (400 errors should not be retried)
+      const response = await api.post('/auth/resend-otp', { email }, {
+        timeout: 60000 // 60 seconds timeout
       });
       
       console.log('AuthContext: Resend OTP response:', response.data);

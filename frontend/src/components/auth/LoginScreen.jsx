@@ -49,47 +49,43 @@ const LoginScreen = () => {
     let showContactSupport = false;
 
     // Network and connectivity errors
-    if (error.code === 'ERR_NETWORK' || 
-        error.message.includes('Network Error') ||
-        error.message.includes('ERR_INTERNET_DISCONNECTED')) {
-      errorMessage = 'No internet connection detected . Please check your network and try again.';
-      errorType = 'network';
-      showRetry = true;
-    }
-    // Timeout errors
-    else if (error.code === 'ECONNABORTED' || 
-             error.message.includes('timeout')) {
-      errorMessage = 'Request timed out after 1 minute. Please check your connection and try again.';
+    if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
+      if (error.message.includes('ERR_CONNECTION_REFUSED') || 
+          error.message.includes('Failed to fetch') ||
+          error.message.includes('net::ERR_CONNECTION_REFUSED')) {
+        errorMessage = 'Backend server is not running. Please start the backend server or check the connection.';
+        errorType = 'backend_unavailable';
+        showContactSupport = true;
+      } else {
+        errorMessage = 'No internet connection. Please check your network and try again.';
+        errorType = 'network';
+        showRetry = true;
+      }
+    } else if (error.code === 'ECONNABORTED') {
+      errorMessage = 'Request timed out. Please try again.';
       errorType = 'timeout';
       showRetry = true;
-    }
-    // Server errors
-    else if (error.response) {
+    } else if (error.response) {
       const status = error.response.status;
       const errorData = error.response.data;
-
+      
       switch (status) {
         case 400:
-          errorMessage = errorData?.error || 'Invalid request. Please check your email and password.';
+          errorMessage = errorData?.error || errorData?.message || 'Invalid email or password. Please check your credentials.';
           errorType = 'validation';
           break;
         case 401:
-          errorMessage = 'Invalid email or password. Please try again.';
-          errorType = 'credentials';
+          errorMessage = 'Invalid email or password. Please check your credentials.';
+          errorType = 'authentication';
           break;
         case 403:
-          errorMessage = 'Access denied. Your account may be suspended. Please contact support.';
+          errorMessage = 'Access denied. Your account may be suspended.';
           errorType = 'access_denied';
           showContactSupport = true;
           break;
         case 404:
-          errorMessage = 'Server not found. Please check if the service is available.';
-          errorType = 'server_not_found';
-          showRetry = true;
-          break;
-        case 408:
-          errorMessage = 'Request timeout. Please try again.';
-          errorType = 'timeout';
+          errorMessage = 'Service not found. Please try again later.';
+          errorType = 'service_not_found';
           showRetry = true;
           break;
         case 429:
@@ -98,65 +94,92 @@ const LoginScreen = () => {
           showRetry = true;
           break;
         case 500:
-          errorMessage = 'Server error. Our team has been notified. Please try again later.';
+          errorMessage = 'Server error. Please try again later or contact support.';
           errorType = 'server_error';
           showRetry = true;
           break;
         case 502:
         case 503:
         case 504:
-          errorMessage = 'Service temporarily unavailable. Please try again in a few minutes.';
+          errorMessage = 'Service temporarily unavailable. Please try again later.';
           errorType = 'service_unavailable';
           showRetry = true;
           break;
         default:
-          errorMessage = errorData?.error || 'An unexpected error occurred. Please try again.';
+          errorMessage = errorData?.error || errorData?.message || 'An unexpected error occurred.';
           errorType = 'unknown';
           showRetry = true;
       }
-    }
-    // Request made but no response
-    else if (error.request) {
-      errorMessage = 'No response from server. Please check your connection and try again.';
+    } else if (error.request) {
+      errorMessage = 'No response from server. Please check your connection.';
       errorType = 'no_response';
       showRetry = true;
-    }
-    // Other errors
-    else {
-      errorMessage = error.message || 'An unexpected error occurred. Please try again.';
+    } else {
+      errorMessage = error.message || 'An unexpected error occurred.';
       errorType = 'unknown';
       showRetry = true;
     }
+    
+    return { errorMessage, errorType, showRetry, showContactSupport };
+  };
 
-    return {
-      message: errorMessage,
-      type: errorType,
-      showRetry,
-      showContactSupport
-    };
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    // Clear field-specific error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (validateForm()) {
-      try {
-        setIsLoggingIn(true);
-        setLoginStep('authenticating');
-        setErrors({});
-        
-        console.log('LoginScreen: Submitting form with data:', formData);
-        const result = await login(formData);
-        console.log('LoginScreen: Login result:', result);
-        
-        if (result.success) {
-          setLoginStep('success');
+    
+    if (!validateForm()) {
+      return;
+    }
+    
+    setIsLoggingIn(true);
+    setLoginStep('authenticating');
+    setErrors({});
+    
+    try {
+      console.log('LoginScreen: Starting login process...');
+      
+      const result = await login({
+        email: formData.email.toLowerCase().trim(),
+        password: formData.password
+      });
+      
+      console.log('LoginScreen: Login result:', result);
+      
+        if (result && result.success) {
           console.log('LoginScreen: Login successful, checking for redirect context...');
+          setLoginStep('success');
           
-          // Check for search or preview redirect context
+          // Check for redirect context
           const searchContext = localStorage.getItem('searchRedirectContext');
           const previewContext = localStorage.getItem('previewRedirectContext');
           
-          let redirectPath = result.user?.role === 'admin' ? '/admin/dashboard' : '/dashboard';
+          // Determine redirect path based on user role
+          let redirectPath = '/dashboard';
+          
+          // Check if user is admin and redirect to admin dashboard
+          if (result.user && result.user.role === 'admin') {
+            console.log('LoginScreen: User is admin, redirecting to admin dashboard');
+            redirectPath = '/admin/dashboard';
+          } else {
+            console.log('LoginScreen: User is regular member, redirecting to member dashboard');
+            redirectPath = '/dashboard';
+          }
+          
           let shouldClearContext = false;
           
           if (searchContext) {
@@ -167,10 +190,8 @@ const LoginScreen = () => {
               // Only use context if it's less than 5 minutes old
               if (contextAge < 5 * 60 * 1000) {
                 console.log('LoginScreen: Found search context, will redirect to search results');
-                redirectPath = '/dashboard';
+                // Keep the role-based redirect path
                 shouldClearContext = true;
-                // Store the context in a different key for the dashboard to use
-                localStorage.setItem('pendingSearchContext', searchContext);
               } else {
                 console.log('LoginScreen: Search context expired, clearing');
                 localStorage.removeItem('searchRedirectContext');
@@ -187,7 +208,7 @@ const LoginScreen = () => {
               // Only use context if it's less than 5 minutes old
               if (contextAge < 5 * 60 * 1000) {
                 console.log('LoginScreen: Found preview context, will redirect to appropriate section');
-                redirectPath = '/dashboard';
+                // Keep the role-based redirect path
                 shouldClearContext = true;
                 // Store the context in a different key for the dashboard to use
                 localStorage.setItem('pendingPreviewContext', previewContext);
@@ -221,87 +242,58 @@ const LoginScreen = () => {
         }
       } catch (error) {
         setLoginStep('error');
-        setIsLoggingIn(false);
+        console.error('LoginScreen: Login error:', error);
         
-        const errorInfo = handleLoginError(error);
+        const { errorMessage, errorType, showRetry, showContactSupport } = handleLoginError(error);
+        
         setErrors({ 
-          general: errorInfo.message,
-          type: errorInfo.type,
-          showRetry: errorInfo.showRetry,
-          showContactSupport: errorInfo.showContactSupport
+          general: errorMessage,
+          type: errorType,
+          showRetry,
+          showContactSupport
         });
+        setIsLoggingIn(false);
       }
-    }
-  };
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    // Clear field error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-    // Clear form error when user starts typing
-    if (errors.form) {
-      setErrors(prev => ({
-        ...prev,
-        form: ''
-      }));
-    }
-    // Reset login state when user starts typing
-    if (isLoggingIn || loginStep !== 'idle') {
-      setIsLoggingIn(false);
-      setLoginStep('idle');
-    }
-  };
-
-  const resetLoginState = () => {
-    setIsLoggingIn(false);
-    setLoginStep('idle');
-    setErrors({});
-  };
+    };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 flex flex-col">
       <WelcomeHeader />
       
-      {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center p-4 relative"
-           style={{
-             backgroundImage: 'linear-gradient(90deg, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.7) 60%, rgba(255,255,255,0.5) 100%), url("back.png")',
-             backgroundPosition: 'center',
-             backgroundRepeat: 'no-repeat',
-             backgroundSize: 'cover',
-           }}>
-        <div className="max-w-md w-full relative z-10">
-          {/* Form Container */}
-          <div className={`bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/20 relative transition-all duration-300 ${
-            isLoggingIn ? 'scale-[1.02] shadow-blue-500/20' : ''
-          }`}>
-            {/* Loading Overlay */}
-            {isLoggingIn && (
-              <div className="absolute inset-0 bg-white/50 backdrop-blur-sm rounded-2xl flex items-center justify-center z-10">
-                <div className="text-center">
-                  <div className="relative">
-                    <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
-                    <div className="absolute inset-0 w-12 h-12 border-4 border-transparent border-t-cyan-500 rounded-full animate-spin mx-auto" style={{ animationDelay: '-0.5s' }}></div>
-                  </div>
-                  <p className="text-gray-600 font-medium" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
-                    Authenticating...
-                  </p>
+      <div className="flex-1 flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-md">
+          {/* Back Button */}
+          <div className="mb-6">
+            <Link
+              to="/"
+              className="inline-flex items-center text-gray-600 hover:text-gray-800 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Home
+            </Link>
+          </div>
+
+          {/* Card */}
+          <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+            {/* Header */}
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
+                Welcome Back
+              </h1>
+              <p className="text-gray-600" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
+                Sign in to your account to continue
+              </p>
+            </div>
+
+            {/* Success State */}
+            {loginStep === 'success' && (
+              <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                  <span className="text-green-700 font-medium">Login successful! Redirecting...</span>
                 </div>
               </div>
             )}
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-gray-900 mb-2" style={{fontFamily: 'Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>Welcome Back</h2>
-              <p className="text-gray-600" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>Sign in to your UNITY Nest account</p>
-            </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Email Field */}
@@ -346,7 +338,7 @@ const LoginScreen = () => {
                     value={formData.password}
                     onChange={handleChange}
                     disabled={isLoggingIn}
-                    className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 ${
+                    className={`w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 ${
                       errors.password ? 'border-red-500' : 'border-gray-300'
                     } ${isLoggingIn ? 'opacity-50 cursor-not-allowed' : ''}`}
                     placeholder="Enter your password"
@@ -354,8 +346,9 @@ const LoginScreen = () => {
                   />
                   <button
                     type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
                     onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    disabled={isLoggingIn}
                   >
                     {showPassword ? (
                       <EyeOff className="h-5 w-5 text-gray-400" />
@@ -377,68 +370,27 @@ const LoginScreen = () => {
                 <p className="mt-1 text-sm text-red-600">{errors.captcha}</p>
               )}
 
-            {/* Enhanced Error Display */}
-            <ErrorDisplay
-              error={errors.general}
-              errorType={errors.type}
-              showRetry={errors.showRetry}
-              showContactSupport={errors.showContactSupport}
-              onRetry={() => {
-                setErrors({});
-                setLoginStep('idle');
-                setIsLoggingIn(false);
-              }}
-              onContactSupport={() => {
-                // You can implement contact support functionality here
-                window.open('mailto:support@dreamsociety.com', '_blank');
-              }}
-            />
-
-            {/* Loading Progress Bar */}
-            {isLoggingIn && (
-              <div className="w-full bg-gray-200 rounded-full h-1 overflow-hidden">
-                <div className="bg-gradient-to-r from-blue-500 to-cyan-500 h-1 rounded-full animate-pulse" 
-                     style={{
-                       animation: 'loading 2s ease-in-out infinite',
-                       background: 'linear-gradient(90deg, #3b82f6, #06b6d4, #3b82f6)',
-                       backgroundSize: '200% 100%'
-                     }}>
-                </div>
-              </div>
-            )}
+              {/* Error Display */}
+              <ErrorDisplay
+                error={errors.general}
+                onRetry={() => {
+                  setErrors({});
+                  setIsLoggingIn(false);
+                  setLoginStep('idle');
+                }}
+              />
 
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={isLoggingIn || loading}
-                className={`w-full py-3 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center shadow-lg ${
-                  loginStep === 'success' 
-                    ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white scale-105' 
-                    : loginStep === 'error'
-                    ? 'bg-gradient-to-r from-red-500 to-pink-500 text-white'
-                    : 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white hover:from-blue-700 hover:to-cyan-600 hover:scale-105'
-                } ${(isLoggingIn || loading) ? 'opacity-75 cursor-not-allowed' : ''}`}
-                style={{fontFamily: 'Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
+                disabled={isLoggingIn || !captchaValid}
+                className="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-cyan-600 transition-all duration-300 flex items-center justify-center shadow-lg disabled:opacity-75 disabled:cursor-not-allowed"
+                style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
               >
-                {loginStep === 'success' ? (
+                {isLoggingIn ? (
                   <>
-                    <CheckCircle className="w-5 h-5 mr-2 animate-pulse" />
-                    Welcome Back!
-                  </>
-                ) : loginStep === 'error' ? (
-                  <>
-                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    Try Again
-                  </>
-                ) : isLoggingIn || loading ? (
-                  <>
-                    <div className="relative">
-                      <Loader className="w-5 h-5 animate-spin mr-2" />
-                      <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full animate-pulse"></div>
-                    </div>
-                    Authenticating...
+                    <Loader className="w-5 h-5 animate-spin mr-2" />
+                    Signing In...
                   </>
                 ) : (
                   'Sign In'
