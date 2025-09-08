@@ -29,7 +29,7 @@ const MembershipPlans = () => {
   const plans = [
     {
       id: 'annual',
-      name: 'Annual Membership',
+      name: 'Annual subscription',
       price: { monthly: 500, yearly: 500 },
       icon: Crown,
       color: 'blue',
@@ -134,9 +134,9 @@ const MembershipPlans = () => {
 
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Annual Membership</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">Annual subscription</h1>
           <p className="text-xl text-gray-600 mb-8">
-            Join Dream Society with our annual membership plan
+            Join Dream Society with our annual subscription plan
           </p>
           <p className="text-lg text-gray-500 mb-8">
             Get complete access to our community network, job opportunities, and professional development resources
@@ -271,13 +271,13 @@ const MembershipPlans = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-              <h3 className="font-semibold text-gray-900 mb-2">What's included in the annual membership?</h3>
-              <p className="text-gray-600">The annual membership includes complete access to all Dream Society features including job posting, networking, skill development resources, and community events for one full year.</p>
+              <h3 className="font-semibold text-gray-900 mb-2">What's included in the annual subscription?</h3>
+              <p className="text-gray-600">The annual subscription includes complete access to all Dream Society features including job posting, networking, skill development resources, and community events for one full year.</p>
             </div>
             
             <div>
               <h3 className="font-semibold text-gray-900 mb-2">Can I get a refund?</h3>
-              <p className="text-gray-600">We offer a 30-day money-back guarantee. If you're not satisfied with your membership, you can request a full refund within 30 days of purchase.</p>
+              <p className="text-gray-600">We offer a 30-day money-back guarantee. If you're not satisfied with your subscription, you can request a full refund within 30 days of purchase.</p>
             </div>
             
             <div>
@@ -301,7 +301,7 @@ const MembershipPlans = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-base font-bold">
-                      Annual Membership Plan
+                      Annual Subscription Plan
                     </h3>
                     <p className="text-blue-100 text-xs">Payment QR Code</p>
                   </div>
@@ -321,7 +321,7 @@ const MembershipPlans = () => {
                   <div className="flex justify-between">
                     <span className="text-gray-600">Plan:</span>
                     <span className="font-semibold text-gray-900">
-                      Annual Membership
+                      Annual Subscription
                     </span>
                   </div>
                   <div className="flex justify-between mt-1">

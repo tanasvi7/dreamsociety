@@ -33,6 +33,7 @@ const LoginScreen = () => {
       newErrors.password = 'Password is required';
     }
     
+    // Captcha validation
     if (!captchaValid) {
       newErrors.captcha = 'Please complete the security verification';
     }

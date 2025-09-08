@@ -93,71 +93,39 @@ exports.register = async (req, res, next) => {
     const { full_name, email, phone, password, working_type } = req.body;
     console.log('Registration attempt with:', { full_name, email, phone, working_type });
     
+    // Basic required field validation
     if (!full_name || !email || !phone || !password) {
       throw new ValidationError('All fields are required');
     }
 
-    // Validate password strength
-    if (password.length < 8) {
-      throw new ValidationError('Password must be at least 8 characters long');
-    }
-
-    // Check for common password patterns
-    const commonPasswords = ['password', '123456', 'qwerty', 'admin', 'user'];
-    if (commonPasswords.includes(password.toLowerCase())) {
-      throw new ValidationError('Password is too common. Please choose a stronger password');
-    }
-
-    // Validate email format
+    // Basic email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       throw new ValidationError('Please enter a valid email address');
     }
-
-    // Validate phone format (basic validation)
-    const phoneRegex = /^\+?[\d\s\-\(\)]{10,}$/;
-    if (!phoneRegex.test(phone)) {
-      throw new ValidationError('Please enter a valid phone number');
-    }
-    
-    // Check if user already exists in database with precise error messages
-    console.log('🔍 Registration validation: Checking database for existing user');
-    console.log('📧 Input email:', email);
-    console.log('📱 Input phone:', phone);
     
     // Normalize email and phone for consistent checking
     const normalizedEmail = email.toLowerCase().trim();
     const normalizedPhone = phone.trim();
-    console.log('📧 Normalized email for database check:', normalizedEmail);
-    console.log('📱 Normalized phone for database check:', normalizedPhone);
     
-    // Check email and phone separately for precise error messages
-    console.log('🔍 Performing database query for email...');
+    // Check if email or phone already exists in database
+    console.log('🔍 Checking database for existing user...');
     const existingEmail = await User.findOne({ where: { email: normalizedEmail } });
-    console.log('📧 Email database query result:', existingEmail ? `FOUND - User ID: ${existingEmail.id}` : 'NOT FOUND - Email is available');
-    
-    console.log('🔍 Performing database query for phone...');
     const existingPhone = await User.findOne({ where: { phone: normalizedPhone } });
-    console.log('📱 Phone database query result:', existingPhone ? `FOUND - User ID: ${existingPhone.id}` : 'NOT FOUND - Phone is available');
     
-    if (existingEmail && existingPhone) {
-      console.log('❌ VALIDATION FAILED: Both email and phone already exist in database');
-      console.log('📧 Existing email user ID:', existingEmail.id);
-      console.log('📱 Existing phone user ID:', existingPhone.id);
-      throw new ValidationError('Email and phone number are already registered. Please use different credentials.');
-    } else if (existingEmail) {
-      console.log('❌ VALIDATION FAILED: Email already exists in database');
-      console.log('📧 Existing email user ID:', existingEmail.id);
+    if (existingEmail) {
+      console.log('❌ Email already exists:', normalizedEmail);
       throw new ValidationError('Email address is already registered. Please try a different email address.');
-    } else if (existingPhone) {
-      console.log('❌ VALIDATION FAILED: Phone already exists in database');
-      console.log('📱 Existing phone user ID:', existingPhone.id);
+    }
+    
+    if (existingPhone) {
+      console.log('❌ Phone already exists:', normalizedPhone);
       throw new ValidationError('Phone number is already registered. Please try a different phone number.');
     }
     
-    console.log('✅ VALIDATION PASSED: No existing user found in database, proceeding with registration...');
+    console.log('✅ Email and phone are available, proceeding with registration...');
     
-    // Hash password with higher salt rounds for production
+    // Hash password
     const saltRounds = process.env.NODE_ENV === 'production' ? 12 : 10;
     const password_hash = await bcrypt.hash(password, saltRounds);
     

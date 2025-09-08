@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft, Loader, AlertCircle, CheckCircle } from 'lucide-react';
-import Captcha from '../common/Captcha';
 import TermsAndConditions from '../common/TermsAndConditions';
 import { apiPost, checkAvailability, clearPendingRegistration } from '../../services/apiService';
 import WelcomeHeader from '../welcome/WelcomeHeader';
@@ -41,7 +40,6 @@ const RegisterScreen = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
-  const [captchaValid, setCaptchaValid] = useState(false);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
   const [isCheckingPhone, setIsCheckingPhone] = useState(false);
   const [availabilityStatus, setAvailabilityStatus] = useState({
@@ -206,10 +204,6 @@ const RegisterScreen = () => {
       newErrors.acceptTerms = 'You must accept the terms and conditions';
     }
 
-    // Captcha validation
-    if (!captchaValid) {
-      newErrors.captcha = 'Please complete the security verification';
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -594,13 +588,6 @@ const RegisterScreen = () => {
                 </div>
               </div>
 
-              {/* Captcha Field */}
-              <div className={isSendingOtp ? 'opacity-50 pointer-events-none' : ''}>
-                <Captcha onValidationChange={setCaptchaValid} />
-              </div>
-              {errors.captcha && (
-                <p className="mt-1 text-sm text-red-600">{errors.captcha}</p>
-              )}
 
               {/* Error Display */}
               {errors.general && (
@@ -615,7 +602,7 @@ const RegisterScreen = () => {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={isSendingOtp || !captchaValid}
+                disabled={isSendingOtp}
                 className="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-cyan-600 transition-all duration-300 flex items-center justify-center shadow-lg disabled:opacity-75 disabled:cursor-not-allowed"
                 style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
               >

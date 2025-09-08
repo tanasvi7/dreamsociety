@@ -13,10 +13,10 @@ declare module 'axios' {
 // API Configuration - Cleaned up URLs
 const API_CONFIG = {
   // Development URL (localhost backend)
-  development: 'https://api.instatripplan.com',
+  development: 'http://localhost:3000',
   
   // Production URL (your server IP)
-  production: 'https://api.instatripplan.com'
+  production: 'http://localhost:3000'
 };
 
 // Force production API (set to true to always use production backend)

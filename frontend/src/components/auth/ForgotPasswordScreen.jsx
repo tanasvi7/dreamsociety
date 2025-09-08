@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, ArrowLeft, Loader, CheckCircle, AlertCircle } from 'lucide-react';
-import Captcha from '../common/Captcha';
 import WelcomeHeader from '../welcome/WelcomeHeader';
 import ErrorDisplay from '../common/ErrorDisplay';
 import api from '../../services/apiService';
@@ -17,7 +16,6 @@ const ForgotPasswordScreen = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
-  const [captchaValid, setCaptchaValid] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -30,9 +28,6 @@ const ForgotPasswordScreen = () => {
       newErrors.email = 'Email is invalid';
     }
     
-    if (!captchaValid) {
-      newErrors.captcha = 'Please complete the security verification';
-    }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -234,12 +229,6 @@ const ForgotPasswordScreen = () => {
       </div>
 
       {/* Captcha Field */}
-      <div className={isLoading ? 'opacity-50 pointer-events-none' : ''}>
-        <Captcha onValidationChange={setCaptchaValid} />
-      </div>
-      {errors.captcha && (
-        <p className="mt-1 text-sm text-red-600">{errors.captcha}</p>
-      )}
 
       {/* Error Display */}
       <ErrorDisplay

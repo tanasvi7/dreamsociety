@@ -301,18 +301,18 @@ const WelcomeScreen = () => {
       Choose Your Plan
     </h2>
     <p className="text-blue-500 mb-10 text-sky-800 drop-shadow-lg">
-      Unlock your career potential with Dream Society. Join our community with our annual membership plan.
+      Unlock your career potential with Dream Society. Join our community with our annual subscription plan.
     </p>
     <div className="flex justify-center">
       
-      {/* Annual Membership Plan */}
+      {/* Annual subscription Plan */}
       <div className="bg-white border-2 border-blue-700 rounded-lg shadow-xl p-8 flex flex-col relative hover:shadow-2xl hover:border-blue-800 hover:scale-105 transition-all duration-300 cursor-pointer group max-w-md w-full">
         <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
           <span className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white px-4 py-2 rounded-full text-sm font-medium group-hover:from-blue-700 group-hover:to-cyan-600 transition-all duration-300 shadow-lg">
             Recommended
           </span>
         </div>
-        <h3 className="text-2xl font-bold mb-4 group-hover:text-blue-800 transition-colors duration-300">Annual Membership</h3>
+        <h3 className="text-2xl font-bold mb-4 group-hover:text-blue-800 transition-colors duration-300">Annual subscription</h3>
         <p className="text-5xl font-bold mb-2 group-hover:text-blue-800 transition-colors duration-300">₹500</p>
         <p className="text-lg text-gray-600 mb-6">per year</p>
         

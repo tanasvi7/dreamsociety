@@ -5,13 +5,13 @@ const nodemailer = require('nodemailer');
 const otpStore = new Map();
 const rateLimitStore = new Map();
 
-// OTP configuration
+// OTP configuration - More lenient for slow connections
 const OTP_CONFIG = {
   LENGTH: 6,
   EXPIRY_MINUTES: 10,
   MAX_ATTEMPTS: 3,
   RATE_LIMIT_MINUTES: 1,
-  MAX_REQUESTS_PER_HOUR: 5
+  MAX_REQUESTS_PER_HOUR: 15  // Increased from 5 to 15 for slow connections
 };
 
 // Validate email service configuration

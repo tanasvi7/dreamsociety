@@ -5,8 +5,43 @@ const rateLimit = require('express-rate-limit');
 // In production: Stricter rate limits for security
 const isDevelopment = process.env.NODE_ENV === 'development';
 
-// Rate limiting for login attempts - UNLIMITED
-const loginLimiter = rateLimit({
+// Request deduplication for slow connections
+const requestDeduplication = new Map();
+
+const addDeduplicationMiddleware = (limiter) => {
+  return (req, res, next) => {
+    const key = `${req.ip}-${req.path}-${JSON.stringify(req.body)}`;
+    const now = Date.now();
+    
+    // Check if same request was made within last 3 seconds (for slow connections)
+    if (requestDeduplication.has(key)) {
+      const lastRequest = requestDeduplication.get(key);
+      if (now - lastRequest < 3000) { // 3 seconds
+        return res.status(429).json({
+          error: 'Duplicate request detected. Please wait before retrying.',
+          type: 'duplicate_request',
+          code: 'DUPLICATE_REQUEST'
+        });
+      }
+    }
+    
+    requestDeduplication.set(key, now);
+    
+    // Clean up old entries every 5 minutes
+    if (Math.random() < 0.01) { // 1% chance
+      for (const [k, v] of requestDeduplication.entries()) {
+        if (now - v > 300000) { // 5 minutes
+          requestDeduplication.delete(k);
+        }
+      }
+    }
+    
+    limiter(req, res, next);
+  };
+};
+
+// Rate limiting for login attempts - with deduplication
+const loginLimiter = addDeduplicationMiddleware(rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute window
   max: 1000, // Allow 1000 requests per minute (effectively unlimited)
   message: {
@@ -27,10 +62,10 @@ const loginLimiter = rateLimit({
     // Use IP address and user agent for better rate limiting
     return `${req.ip}-${req.get('User-Agent')}`;
   }
-});
+}));
 
-// Rate limiting for registration attempts - UNLIMITED
-const registrationLimiter = rateLimit({
+// Rate limiting for registration attempts - with deduplication
+const registrationLimiter = addDeduplicationMiddleware(rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute window
   max: 1000, // Allow 1000 requests per minute (effectively unlimited)
   message: {
@@ -51,10 +86,10 @@ const registrationLimiter = rateLimit({
     // Use IP address for registration rate limiting
     return req.ip;
   }
-});
+}));
 
-// Rate limiting for OTP requests - UNLIMITED
-const otpLimiter = rateLimit({
+// Rate limiting for OTP requests - with deduplication
+const otpLimiter = addDeduplicationMiddleware(rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute window
   max: 1000, // Allow 1000 requests per minute (effectively unlimited)
   message: {
@@ -76,7 +111,7 @@ const otpLimiter = rateLimit({
     const email = req.body.email || req.query.email;
     return email ? `${req.ip}-${email}` : req.ip;
   }
-});
+}));
 
 // General API rate limiting - More lenient
 const apiLimiter = rateLimit({

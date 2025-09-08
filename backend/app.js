@@ -132,16 +132,20 @@ if (process.env.NODE_ENV === 'production') {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Global rate limiting
+// Global rate limiting - More lenient for slow connections
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'production' ? 100 : 1000, // limit each IP to 100 requests per windowMs in production
+  max: process.env.NODE_ENV === 'production' ? 300 : 2000, // Increased from 100 to 300 for slow connections
   message: {
     error: 'Too many requests from this IP, please try again later.',
     code: 'RATE_LIMIT_EXCEEDED'
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Skip rate limiting for auth routes to prevent double limiting
+  skip: (req) => {
+    return req.path.startsWith('/auth/');
+  }
 });
 
 app.use(globalLimiter);
