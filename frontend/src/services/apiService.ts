@@ -13,10 +13,10 @@ declare module 'axios' {
 // API Configuration - Cleaned up URLs
 const API_CONFIG = {
   // Development URL (localhost backend)
-  development: 'http://localhost:3000',
+  development: 'http://localhost:2168',
   
   // Production URL (your server IP)
-  production: 'http://localhost:3000'
+  production: 'http://localhost:2168'
 };
 
 // Force production API (set to true to always use production backend)
@@ -144,9 +144,7 @@ api.interceptors.request.use(
 // Add a response interceptor for debugging and error handling
 api.interceptors.response.use(
   (response) => {
-    const endTime = new Date();
-    const duration = endTime.getTime() - response.config.metadata?.startTime.getTime();
-    console.log(`API Response: ${response.status} ${response.config.url} (${duration}ms)`);
+    // Only log errors, not successful responses to reduce console noise
     return response;
   },
   (error) => {

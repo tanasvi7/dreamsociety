@@ -1,421 +1,287 @@
-
-import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { ArrowLeft, Loader, Shield, Mail, AlertCircle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Loader, AlertCircle, CheckCircle, Mail, RefreshCw } from 'lucide-react';
 import WelcomeHeader from '../welcome/WelcomeHeader';
 
 const OTPVerification = () => {
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [timer, setTimer] = useState(0);
-  const [canResend, setCanResend] = useState(false);
-  const [error, setError] = useState('');
+  const [otp, setOtp] = useState('');
+  const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
-  const [verificationAttempts, setVerificationAttempts] = useState(0);
-  const [sessionExpired, setSessionExpired] = useState(false);
-  const inputRefs = useRef([]);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [success, setSuccess] = useState(false);
   const { verifyOtp, resendOtp } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // Get pending registration email from localStorage
-  const pendingEmail = localStorage.getItem('pendingRegistrationEmail');
-  const registrationTimestamp = localStorage.getItem('registrationTimestamp');
+  // Get email from location state or localStorage
+  const email = location.state?.email || localStorage.getItem('pendingRegistrationEmail');
 
   useEffect(() => {
-    // Check if registration session is valid
-    if (!pendingEmail || !registrationTimestamp) {
-      console.log('No pending registration found, redirecting to register');
+    // If no email found, redirect to registration
+    if (!email) {
       navigate('/register');
       return;
     }
 
-    // Check if session has expired (30 minutes)
-    const sessionAge = Date.now() - parseInt(registrationTimestamp);
-    const maxSessionAge = 30 * 60 * 1000; // 30 minutes
-    
-    if (sessionAge > maxSessionAge) {
-      console.log('Registration session expired');
-      setSessionExpired(true);
-      // Clear expired session data
-      localStorage.removeItem('pendingRegistrationEmail');
-      localStorage.removeItem('registrationTimestamp');
-      return;
-    }
-    
-    // Set initial timer (10 minutes)
-    setTimer(10 * 60); // 10 minutes in seconds
-  }, [pendingEmail, registrationTimestamp, navigate]);
+    // Start resend cooldown timer
+    const timer = setInterval(() => {
+      setResendCooldown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
-  useEffect(() => {
-    if (timer > 0) {
-      const interval = setInterval(() => {
-        setTimer(prev => {
-          const newTimer = prev - 1;
-          if (newTimer <= 0) {
-            setCanResend(true);
-          }
-          return newTimer;
-        });
-      }, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [timer]);
+    return () => clearInterval(timer);
+  }, [email, navigate]);
 
-  const handleChange = (index, value) => {
-    if (value.length > 1) return;
-    
-    const newOtp = [...otp];
-    newOtp[index] = value;
-    setOtp(newOtp);
-    setError('');
+  const validateOTP = () => {
+    const newErrors = {};
 
-    // Auto-focus next input
-    if (value && index < 5) {
-      inputRefs.current[index + 1].focus();
+    if (!otp.trim()) {
+      newErrors.otp = 'OTP is required';
+    } else if (!/^\d{6}$/.test(otp)) {
+      newErrors.otp = 'OTP must be 6 digits';
     }
 
-    // Auto-submit when all fields are filled
-    if (newOtp.every(digit => digit) && newOtp.join('').length === 6) {
-      handleVerify(newOtp.join(''));
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleChange = (e) => {
+    const value = e.target.value.replace(/\D/g, ''); // Only allow digits
+    if (value.length <= 6) {
+      setOtp(value);
+      
+      // Clear error when user starts typing
+      if (errors.otp) {
+        setErrors(prev => ({ ...prev, otp: '' }));
+      }
     }
   };
 
-  const handleKeyDown = (index, e) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      inputRefs.current[index - 1].focus();
-    }
-  };
-
-  const handleVerify = async (otpValue = otp.join('')) => {
-    if (otpValue.length !== 6) {
-      setError('Please enter all 6 digits');
-      return;
-    }
-
-    // Check verification attempts limit
-    if (verificationAttempts >= 5) {
-      setError('Too many verification attempts. Please request a new OTP.');
-      return;
-    }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!validateOTP()) return;
 
     setLoading(true);
-    setError('');
+    setErrors({});
 
     try {
-      const result = await verifyOtp({ email: pendingEmail, otp: otpValue });
+      console.log('Verifying OTP for email:', email);
       
+      const result = await verifyOtp({
+        email: email.toLowerCase().trim(),
+        otp: otp.trim()
+      });
+
       if (result.success) {
-        console.log('OTP verification successful, checking for redirect context...');
+        console.log('OTP verification successful');
+        setSuccess(true);
         
-        // Check for search or preview redirect context
-        const pendingSearchContext = localStorage.getItem('pendingSearchContext');
-        const pendingPreviewContext = localStorage.getItem('pendingPreviewContext');
-        
-        // Determine redirect path based on user role
-        let redirectPath = '/dashboard';
-        
-        // Check if user is admin and redirect to admin dashboard
-        if (result.user && result.user.role === 'admin') {
-          console.log('OTPVerification: User is admin, redirecting to admin dashboard');
-          redirectPath = '/admin/dashboard';
-        } else {
-          console.log('OTPVerification: User is regular member, redirecting to member dashboard');
-          redirectPath = '/dashboard';
-        }
-        
-        let shouldClearContext = false;
-        
-        if (pendingSearchContext) {
-          try {
-            const context = JSON.parse(pendingSearchContext);
-            const contextAge = Date.now() - context.timestamp;
-            
-            // Only use context if it's less than 5 minutes old
-            if (contextAge < 5 * 60 * 1000) {
-              console.log('OTPVerification: Found search context, will redirect to search results');
-              // Keep the role-based redirect path
-              shouldClearContext = true;
-            } else {
-              console.log('OTPVerification: Search context expired, clearing');
-              localStorage.removeItem('pendingSearchContext');
-            }
-          } catch (error) {
-            console.error('OTPVerification: Error parsing search context:', error);
-            localStorage.removeItem('pendingSearchContext');
-          }
-        } else if (pendingPreviewContext) {
-          try {
-            const context = JSON.parse(pendingPreviewContext);
-            const contextAge = Date.now() - context.timestamp;
-            
-            // Only use context if it's less than 5 minutes old
-            if (contextAge < 5 * 60 * 1000) {
-              console.log('OTPVerification: Found preview context, will redirect to appropriate section');
-              // Keep the role-based redirect path
-              shouldClearContext = true;
-            } else {
-              console.log('OTPVerification: Preview context expired, clearing');
-              localStorage.removeItem('pendingPreviewContext');
-            }
-          } catch (error) {
-            console.error('OTPVerification: Error parsing preview context:', error);
-            localStorage.removeItem('pendingPreviewContext');
-          }
-        }
-        
-        console.log('OTPVerification: Final redirect path:', redirectPath);
-        navigate(redirectPath);
-        
-        // Clear the original context after navigation
-        if (shouldClearContext) {
-          localStorage.removeItem('searchRedirectContext');
-          localStorage.removeItem('previewRedirectContext');
-        }
+        // Show success message briefly before navigation
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 2000);
       } else {
-        setVerificationAttempts(prev => prev + 1);
-        
-        // Handle specific error types
-        if (result.type === 'otp_expired') {
-          setError('OTP has expired. Please request a new one.');
-          setOtp(['', '', '', '', '', '']);
-          inputRefs.current[0].focus();
-        } else if (result.type === 'max_attempts_exceeded' || result.error?.includes('Maximum verification attempts exceeded')) {
-          setError('Too many failed attempts. Please request a new OTP.');
-          setOtp(['', '', '', '', '', '']);
-          // Enable resend button immediately
-          setCanResend(true);
-          setTimer(0);
-          inputRefs.current[0].focus();
-        } else if (result.type === 'session_expired') {
-          setSessionExpired(true);
-          setError('Registration session expired. Please start registration again.');
-        } else {
-          setError(result.error || 'Invalid OTP. Please try again.');
-          setOtp(['', '', '', '', '', '']);
-          inputRefs.current[0].focus();
-        }
+        console.log('OTP verification failed:', result.error);
+        setErrors({ general: result.error });
       }
     } catch (error) {
-      setVerificationAttempts(prev => prev + 1);
-      
-      // Handle specific error messages from backend
-      if (error.message?.includes('Maximum verification attempts exceeded')) {
-        setError('Too many failed attempts. Please request a new OTP.');
-        setCanResend(true);
-        setTimer(0);
-      } else {
-        setError('Verification failed. Please try again.');
-      }
-      
-      setOtp(['', '', '', '', '', '']);
-      inputRefs.current[0].focus();
+      console.error('OTP verification error:', error);
+      setErrors({ general: 'OTP verification failed. Please try again.' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleResend = async () => {
-    if (!canResend || resendLoading) return;
+  const handleResendOTP = async () => {
+    if (resendCooldown > 0) return;
 
     setResendLoading(true);
-    setError('');
+    setErrors({});
 
     try {
-      const result = await resendOtp(pendingEmail);
+      const result = await resendOtp(email);
       
       if (result.success) {
-        setTimer(10 * 60); // Reset timer to 10 minutes
-        setCanResend(false);
-        setVerificationAttempts(0); // Reset verification attempts
-        setOtp(['', '', '', '', '', '']);
-        inputRefs.current[0].focus();
-        
-        // Show success message
-        setError(''); // Clear any previous errors
+        setResendCooldown(60); // 60 seconds cooldown
+        setErrors({ success: 'OTP resent successfully. Please check your email.' });
       } else {
-        // Handle specific resend errors
-        if (result.type === 'no_pending_registration') {
-          setSessionExpired(true);
-          setError('No pending registration found. Please start registration again.');
-        } else if (result.type === 'session_expired') {
-          setSessionExpired(true);
-          setError('Registration session expired. Please register again.');
-        } else {
-          setError(result.error || 'Failed to resend OTP. Please try again.');
-        }
+        setErrors({ general: result.error });
       }
     } catch (error) {
-      // Handle specific error messages
-      if (error.message?.includes('Maximum verification attempts exceeded')) {
-        setError('Too many failed attempts. Please request a new OTP.');
-        setCanResend(true);
-        setTimer(0);
-      } else {
-        setError('Failed to resend OTP. Please try again.');
-      }
+      console.error('Resend OTP error:', error);
+      setErrors({ general: 'Failed to resend OTP. Please try again.' });
     } finally {
       setResendLoading(false);
     }
   };
 
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
   const handleBackToRegister = () => {
-    // Clear all registration data
+    // Clear pending registration data
     localStorage.removeItem('pendingRegistrationEmail');
     localStorage.removeItem('registrationTimestamp');
-    localStorage.removeItem('pendingSearchContext');
-    localStorage.removeItem('pendingPreviewContext');
     navigate('/register');
   };
 
-  // Show session expired message
-  if (sessionExpired) {
-    return (
-      <>
-        <WelcomeHeader />
-        <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-white flex items-center justify-center px-4 py-8">
-          <div className="w-full max-w-md">
-            <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 text-center">
-              <div className="flex items-center justify-center mb-4">
-                <AlertCircle className="w-12 h-12 text-red-500" />
-              </div>
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">Session Expired</h1>
-              <p className="text-gray-600 mb-6">
-                Your registration session has expired. Please start the registration process again.
-              </p>
-              <button
-                onClick={handleBackToRegister}
-                className="w-full bg-gradient-to-r from-sky-500 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:from-sky-600 hover:to-blue-700 transition-all duration-200"
-              >
-                Start Registration Again
-              </button>
-            </div>
-          </div>
-        </div>
-      </>
-    );
+  if (!email) {
+    return null; // Will redirect in useEffect
   }
 
   return (
-    <>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 flex flex-col">
       <WelcomeHeader />
       
-      <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-white flex items-center justify-center px-4 py-8">
+      <div className="flex-1 flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-md">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center mb-4">
-              <Shield className="w-12 h-12 text-sky-600" />
-            </div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Verify Your Email</h1>
-            <p className="text-gray-600">
-              We've sent a 6-digit code to <br />
-              <span className="font-semibold text-sky-600">{pendingEmail}</span>
-            </p>
+          {/* Back Button */}
+          <div className="mb-6">
+            <button
+              onClick={handleBackToRegister}
+              className="inline-flex items-center text-gray-600 hover:text-gray-800 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Registration
+            </button>
           </div>
 
-          {/* OTP Input */}
-          <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 mb-6">
-            <form onSubmit={(e) => { e.preventDefault(); handleVerify(); }}>
-              <div className="flex justify-between mb-6">
-                {otp.map((digit, index) => (
-                  <input
-                    key={index}
-                    ref={(el) => inputRefs.current[index] = el}
-                    type="text"
-                    maxLength="1"
-                    value={digit}
-                    onChange={(e) => handleChange(index, e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(index, e)}
-                    className="w-12 h-12 md:w-14 md:h-14 text-center text-xl md:text-2xl font-bold border-2 border-gray-300 rounded-lg focus:border-sky-500 focus:outline-none transition-colors"
-                    style={{ fontFamily: 'monospace' }}
-                    disabled={loading}
-                  />
-                ))}
+          {/* Card */}
+          <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+            {/* Header */}
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Mail className="w-8 h-8 text-blue-600" />
+              </div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
+                Verify Your Email
+              </h1>
+              <p className="text-gray-600" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
+                We've sent a 6-digit code to
+              </p>
+              <p className="text-blue-600 font-semibold">{email}</p>
+            </div>
+
+            {/* Success State */}
+            {success && (
+              <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                  <span className="text-green-700 font-medium">Email verified successfully! Your account is now active. Redirecting to dashboard...</span>
+                </div>
+              </div>
+            )}
+
+            {/* Success Message */}
+            {errors.success && (
+              <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                  <span className="text-green-700 font-medium">{errors.success}</span>
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* OTP Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
+                  Verification Code
+                </label>
+                <input
+                  type="text"
+                  value={otp}
+                  onChange={handleChange}
+                  disabled={loading || success}
+                  className={`w-full px-4 py-4 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-center text-2xl tracking-widest font-mono ${
+                    errors.otp ? 'border-red-500' : 'border-gray-300'
+                  } ${loading || success ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  placeholder="000000"
+                  maxLength={6}
+                  style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
+                />
+                {errors.otp && (
+                  <p className="mt-1 text-sm text-red-600">{errors.otp}</p>
+                )}
               </div>
 
-              {/* Error Message */}
-              {error && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              {/* Error Display */}
+              {errors.general && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
                   <div className="flex items-center space-x-2">
-                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                    <p className="text-red-600 text-sm">{error}</p>
+                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                    <p className="text-red-700 text-sm">{errors.general}</p>
                   </div>
                 </div>
               )}
 
-              {/* Verification Attempts Warning */}
-              {verificationAttempts >= 3 && (
-                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <div className="flex items-center space-x-2">
-                    <AlertCircle className="w-4 h-4 text-yellow-500 flex-shrink-0" />
-                    <p className="text-yellow-700 text-sm">
-                      {verificationAttempts}/5 attempts used. Too many failed attempts will require a new OTP.
-                    </p>
-                  </div>
-                </div>
-              )}
-
+              {/* Submit Button */}
               <button
                 type="submit"
-                disabled={loading || otp.join('').length !== 6 || verificationAttempts >= 5}
-                className="w-full bg-gradient-to-r from-sky-500 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:from-sky-600 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 mb-4"
+                disabled={loading || success || otp.length !== 6}
+                className="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-cyan-600 transition-all duration-300 flex items-center justify-center shadow-lg disabled:opacity-75 disabled:cursor-not-allowed"
+                style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
               >
                 {loading ? (
-                  <div className="flex items-center justify-center">
+                  <>
                     <Loader className="w-5 h-5 animate-spin mr-2" />
                     Verifying...
-                  </div>
+                  </>
+                ) : success ? (
+                  <>
+                    <CheckCircle className="w-5 h-5 mr-2" />
+                    Verified!
+                  </>
                 ) : (
                   'Verify Email'
                 )}
               </button>
-            </form>
 
-            {/* Timer and Resend */}
-            <div className="text-center">
-              {timer > 0 ? (
-                <p className="text-gray-500 text-sm">
-                  Resend code in <span className="font-mono font-semibold">{formatTime(timer)}</span>
+              {/* Resend OTP */}
+              <div className="text-center">
+                <p className="text-gray-600 text-sm mb-2" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
+                  Didn't receive the code?
                 </p>
-              ) : (
                 <button
-                  onClick={handleResend}
-                  disabled={resendLoading}
-                  className="text-sky-600 hover:text-sky-700 font-medium text-sm disabled:opacity-50 flex items-center justify-center mx-auto"
+                  type="button"
+                  onClick={handleResendOTP}
+                  disabled={resendLoading || resendCooldown > 0 || success}
+                  className="text-blue-600 hover:text-blue-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center mx-auto"
+                  style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
                 >
                   {resendLoading ? (
                     <>
-                      <Loader className="w-4 h-4 animate-spin mr-2" />
+                      <Loader className="w-4 h-4 animate-spin mr-1" />
                       Sending...
                     </>
+                  ) : resendCooldown > 0 ? (
+                    `Resend in ${resendCooldown}s`
                   ) : (
-                    'Resend verification code'
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-1" />
+                      Resend Code
+                    </>
                   )}
                 </button>
-              )}
-            </div>
-          </div>
+              </div>
+            </form>
 
-          {/* Back to Register */}
-          <div className="text-center">
-            <button
-              onClick={handleBackToRegister}
-              className="flex items-center justify-center mx-auto text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to registration
-            </button>
+            {/* Help Text */}
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-600 text-center" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
+                <strong>Check your spam folder</strong> if you don't see the email in your inbox.
+                The verification code will expire in 10 minutes.
+              </p>
+            </div>
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 };
 

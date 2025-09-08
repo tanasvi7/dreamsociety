@@ -38,14 +38,8 @@ const GlobalSearch = ({
     setIsSearching(true);
     setHasSearched(true);
     try {
-      console.log('🔍 GlobalSearch: Starting search for:', searchTerm);
-      console.log('🔍 GlobalSearch: User authentication status:', !!user);
-      console.log('🔍 GlobalSearch: User details:', user ? { id: user.id, role: user.role } : 'Not logged in');
-      console.log('🔍 GlobalSearch: Subscription status:', { is_subscribed, subscriptionLoading });
-      
       // Test backend connection first
       const isConnected = await searchService.testBackendConnection();
-      console.log('🔍 GlobalSearch: Backend connected:', isConnected);
       
       if (!isConnected) {
         console.error('🔍 GlobalSearch: Backend not accessible');

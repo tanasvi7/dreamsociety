@@ -1,369 +1,345 @@
-const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 
-// In-memory storage for OTPs with expiration
+// In-memory OTP storage (in production, use Redis or database)
 const otpStore = new Map();
-const rateLimitStore = new Map();
 
-// OTP configuration - More lenient for slow connections
-const OTP_CONFIG = {
-  LENGTH: 6,
-  EXPIRY_MINUTES: 10,
-  MAX_ATTEMPTS: 3,
-  RATE_LIMIT_MINUTES: 1,
-  MAX_REQUESTS_PER_HOUR: 15  // Increased from 5 to 15 for slow connections
-};
-
-// Validate email service configuration
-const validateEmailConfig = () => {
-  const requiredVars = ['GMAIL_USER', 'GMAIL_APP_PASSWORD'];
-  const missing = requiredVars.filter(varName => !process.env[varName]);
-  
-  if (missing.length > 0) {
-    throw new Error(`Missing required email configuration: ${missing.join(', ')}`);
-  }
-};
-
-// Gmail transporter configuration
+// Email transporter configuration using existing Gmail setup
 const createTransporter = () => {
-  validateEmailConfig();
-  
   return nodemailer.createTransport({
     service: 'gmail',
     auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD
-    },
-    secure: true,
-    port: 465,
-    tls: {
-      rejectUnauthorized: false
+      user: process.env.GMAIL_USER, // Gmail address
+      pass: process.env.GMAIL_APP_PASSWORD  // Gmail app password
     }
   });
 };
 
-// Clean up expired OTPs every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, data] of otpStore.entries()) {
-    if (now > data.expiresAt) {
-      otpStore.delete(key);
-    }
-  }
-  // Clean up expired rate limit entries
-  for (const [key, data] of rateLimitStore.entries()) {
-    if (now > data.expiresAt) {
-      rateLimitStore.delete(key);
-    }
-  }
-}, 5 * 60 * 1000);
-
+// Generate 6-digit OTP
 const generateOTP = () => {
-  return crypto.randomInt(100000, 999999).toString();
+  return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-const checkRateLimit = (identifier) => {
-  const now = Date.now();
-  const key = `rate_limit_${identifier}`;
-  if (!rateLimitStore.has(key)) {
-    rateLimitStore.set(key, {
-      count: 1,
-      firstRequest: now,
-      expiresAt: now + (OTP_CONFIG.RATE_LIMIT_MINUTES * 60 * 1000)
-    });
-    return true;
-  }
-  const rateLimit = rateLimitStore.get(key);
-  if (now < rateLimit.expiresAt) {
-    if (rateLimit.count >= OTP_CONFIG.MAX_REQUESTS_PER_HOUR) {
-      return false;
-    }
-    rateLimit.count++;
-    return true;
-  } else {
-    rateLimitStore.set(key, {
-      count: 1,
-      firstRequest: now,
-      expiresAt: now + (OTP_CONFIG.RATE_LIMIT_MINUTES * 60 * 1000)
-    });
-    return true;
-  }
+// Store OTP with expiration
+const storeOTP = (email, otp, purpose = 'registration') => {
+  const key = `${email}:${purpose}`;
+  const expiresAt = Date.now() + (10 * 60 * 1000); // 10 minutes
+  
+  otpStore.set(key, {
+    otp,
+    expiresAt,
+    attempts: 0,
+    createdAt: Date.now(),
+    verified: false
+  });
+  
+  console.log(`📱 OTP stored for ${email} (${purpose}): ${otp}`);
+  return expiresAt;
 };
 
-const sendOTP = async (email, purpose = 'registration') => {
-  try {
-    if (!checkRateLimit(email)) {
-      throw new Error('Rate limit exceeded. Please wait before requesting another OTP.');
-    }
-    
-    // Clear any existing OTP for this email to prevent conflicts
-    const existingOtp = otpStore.get(email);
-    if (existingOtp) {
-      console.log(`[OTP SERVICE] Clearing existing OTP for email: ${email}, purpose: ${existingOtp.purpose}`);
-      otpStore.delete(email);
-    }
-    
-    const otp = generateOTP();
-    const expiresAt = Date.now() + (OTP_CONFIG.EXPIRY_MINUTES * 60 * 1000);
-    otpStore.set(email, {
-      otp,
-      expiresAt,
-      attempts: 0,
-      createdAt: Date.now(),
-      purpose // Add purpose to distinguish between registration and forgot password
-    });
-    
-    console.log(`[OTP SERVICE] Generated new OTP for email: ${email}, purpose: ${purpose}`);
-
-    // Create HTML email template based on purpose
-    const subject = purpose === 'forgot_password' 
-      ? 'Your DreamSociety Password Reset Code'
-      : 'Your DreamSociety Verification Code';
-    
-    const title = purpose === 'forgot_password' 
-      ? 'Password Reset Code'
-      : 'Email Verification Code';
-    
-    const description = purpose === 'forgot_password'
-      ? 'To reset your password, please use the verification code below:'
-      : 'To complete your registration, please use the verification code below:';
-
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>DreamSociety ${title}</title>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-          .otp-code { background: #fff; border: 2px dashed #667eea; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; }
-          .otp-number { font-size: 32px; font-weight: bold; color: #667eea; letter-spacing: 5px; }
-          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
-          .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>DreamSociety</h1>
-            <p>${title}</p>
-          </div>
-          <div class="content">
-            <h2>Hello!</h2>
-            <p>${description}</p>
-            
-            <div class="otp-code">
-              <div class="otp-number">${otp}</div>
-            </div>
-            
-            <p><strong>This code will expire in ${OTP_CONFIG.EXPIRY_MINUTES} minutes.</strong></p>
-            
-            <div class="warning">
-              <strong>Security Notice:</strong>
-              <ul>
-                <li>Never share this code with anyone</li>
-                <li>DreamSociety will never ask for this code via phone or email</li>
-                <li>If you didn't request this code, please ignore this email</li>
-              </ul>
-            </div>
-            
-            <p>If you have any questions, please contact our support team.</p>
-            
-            <p>Best regards,<br>The DreamSociety Team</p>
-          </div>
-          <div class="footer">
-            <p>This is an automated message, please do not reply to this email.</p>
-            <p>&copy; 2024 DreamSociety. All rights reserved.</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-
-    // Send OTP via Gmail
-    const transporter = createTransporter();
-    const mailOptions = {
-      from: `"DreamSociety" <${process.env.GMAIL_USER}>`,
-      to: email,
-      subject: subject,
-      html: htmlContent,
-      text: `Your DreamSociety ${title.toLowerCase()} is: ${otp}\n\nThis code will expire in ${OTP_CONFIG.EXPIRY_MINUTES} minutes.\n\nSecurity Notice:\n- Never share this code with anyone\n- DreamSociety will never ask for this code via phone or email\n- If you didn't request this code, please ignore this email\n\nBest regards,\nThe DreamSociety Team`
+// Verify OTP
+const verifyOTP = (email, otp, purpose = 'registration') => {
+  const key = `${email}:${purpose}`;
+  const stored = otpStore.get(key);
+  
+  if (!stored) {
+    return {
+      success: false,
+      message: 'OTP not found or expired. Please request a new one.'
     };
-
-    try {
-      await transporter.sendMail(mailOptions);
-      console.log(`[OTP SERVICE] OTP sent to email: ${email} | OTP: ${otp} | Purpose: ${purpose}`);
-      console.log(`[OTP SERVICE] Email sent successfully via Gmail`);
-    } catch (err) {
-      console.error('[OTP SERVICE] Email sending failed:', err.message);
-      
-      // Remove OTP from store if email fails
-      otpStore.delete(email);
-      
-      // For development, still log the OTP even if email fails
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[OTP SERVICE] (Email send failed) OTP for ${email}: ${otp}`);
-      }
-      
-      throw new Error('Failed to send OTP email. Please try again.');
-    }
-
+  }
+  
+  // Check if OTP is expired
+  if (Date.now() > stored.expiresAt) {
+    otpStore.delete(key);
+    return {
+      success: false,
+      message: 'OTP has expired. Please request a new one.'
+    };
+  }
+  
+  // Check attempt limit
+  if (stored.attempts >= 3) {
+    otpStore.delete(key);
+    return {
+      success: false,
+      message: 'Maximum verification attempts exceeded. Please request a new OTP.'
+    };
+  }
+  
+  // Verify OTP
+  if (stored.otp === otp) {
+    // Mark as verified instead of deleting
+    stored.verified = true;
+    otpStore.set(key, stored);
     return {
       success: true,
-      message: 'OTP sent successfully to your email',
-      expiresIn: OTP_CONFIG.EXPIRY_MINUTES
+      message: 'OTP verified successfully'
     };
-  } catch (error) {
-    console.error('[OTP SERVICE] Error sending OTP:', error);
-    throw error;
+  } else {
+    // Increment attempt count
+    stored.attempts += 1;
+    otpStore.set(key, stored);
+    
+    return {
+      success: false,
+      message: 'Invalid OTP. Please check and try again.'
+    };
   }
 };
 
-const verifyOTP = async (email, otp, purpose = 'registration') => {
+// Send OTP via email
+const sendOTP = async (email, purpose = 'registration') => {
   try {
-    console.log(`[OTP SERVICE] Verifying OTP for email: ${email}, purpose: ${purpose}`);
-    const otpData = otpStore.get(email);
+    const otp = generateOTP();
+    const expiresAt = storeOTP(email, otp, purpose);
     
-    // Check if OTP exists
-    if (!otpData) {
-      console.log(`[OTP SERVICE] No OTP data found for email: ${email}`);
-      throw new Error('OTP not found or expired');
-    }
+    const transporter = createTransporter();
     
-    console.log(`[OTP SERVICE] Found OTP data for email: ${email}, purpose: ${otpData.purpose}, attempts: ${otpData.attempts}`);
+    // Verify Gmail connection
+    await transporter.verify();
+    console.log('✅ Gmail connection verified successfully');
     
-    // Check if OTP has expired
-    if (Date.now() > otpData.expiresAt) {
-      otpStore.delete(email);
-      throw new Error('OTP has expired');
-    }
+    const mailOptions = {
+      from: process.env.GMAIL_USER, // Use Gmail address as sender
+      to: email,
+      subject: purpose === 'registration' 
+        ? 'Verify Your Email - Dream Society Registration'
+        : 'Reset Your Password - Dream Society',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">Dream Society</h1>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">
+              ${purpose === 'registration' ? 'Welcome to Dream Society!' : 'Password Reset Request'}
+            </h2>
+            
+            <p style="color: #666; font-size: 16px; line-height: 1.6;">
+              ${purpose === 'registration' 
+                ? 'Thank you for registering with Dream Society. To complete your registration, please verify your email address using the code below:'
+                : 'You have requested to reset your password. Use the code below to proceed:'
+              }
+            </p>
+            
+            <div style="background: white; border: 2px solid #667eea; border-radius: 10px; padding: 20px; margin: 20px 0; text-align: center;">
+              <h1 style="color: #667eea; font-size: 36px; margin: 0; letter-spacing: 5px; font-family: monospace;">${otp}</h1>
+            </div>
+            
+            <p style="color: #666; font-size: 14px;">
+              This code will expire in <strong>10 minutes</strong>.
+            </p>
+            
+            <p style="color: #666; font-size: 14px;">
+              If you didn't request this ${purpose === 'registration' ? 'registration' : 'password reset'}, please ignore this email.
+            </p>
+          </div>
+          
+          <div style="background: #333; padding: 20px; text-align: center;">
+            <p style="color: #999; font-size: 12px; margin: 0;">
+              © 2024 Dream Society. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `,
+      text: `
+        ${purpose === 'registration' ? 'Welcome to Dream Society!' : 'Password Reset Request'}
+        
+        ${purpose === 'registration' 
+          ? 'Thank you for registering with Dream Society. To complete your registration, please verify your email address using the code below:'
+          : 'You have requested to reset your password. Use the code below to proceed:'
+        }
+        
+        Your verification code: ${otp}
+        
+        This code will expire in 10 minutes.
+        
+        If you didn't request this ${purpose === 'registration' ? 'registration' : 'password reset'}, please ignore this email.
+        
+        © 2024 Dream Society. All rights reserved.
+      `
+    };
     
-    // Check if maximum attempts already exceeded
-    if (otpData.attempts >= OTP_CONFIG.MAX_ATTEMPTS) {
-      // Don't delete immediately, let user know they need to request new OTP
-      throw new Error('Maximum verification attempts exceeded. Please request a new OTP.');
-    }
+    await transporter.sendMail(mailOptions);
     
-    // Check if purpose matches (prevent using registration OTP for forgot password and vice versa)
-    if (otpData.purpose !== purpose) {
-      console.log(`[OTP SERVICE] Purpose mismatch for email: ${email}. Expected: ${purpose}, Found: ${otpData.purpose}`);
-      throw new Error(`Invalid OTP purpose. This OTP was sent for ${otpData.purpose}, not ${purpose}.`);
-    }
+    console.log(`📧 OTP sent successfully to ${email} (${purpose})`);
     
-    // Increment attempts first
-    otpData.attempts++;
+    return {
+      success: true,
+      message: 'OTP sent successfully',
+      expiresIn: Math.floor((expiresAt - Date.now()) / 1000) // seconds until expiration
+    };
     
-    // Check if OTP is correct
-    if (otpData.otp === otp) {
-      console.log(`[OTP SERVICE] OTP verified successfully for email: ${email}, purpose: ${purpose}`);
-      // For forgot password flow, mark as verified but don't delete yet
-      if (purpose === 'forgot_password') {
-        otpData.verified = true;
-        otpData.verifiedAt = Date.now();
-        return {
-          success: true,
-          message: 'OTP verified successfully'
-        };
-      } else {
-        // For registration flow, delete OTP immediately
-        otpStore.delete(email);
-        return {
-          success: true,
-          message: 'OTP verified successfully'
-        };
-      }
-    } else {
-      // Invalid OTP
-      const remainingAttempts = OTP_CONFIG.MAX_ATTEMPTS - otpData.attempts;
-      console.log(`[OTP SERVICE] Invalid OTP for email: ${email}. Attempts: ${otpData.attempts}, Remaining: ${remainingAttempts}`);
-      
-      if (remainingAttempts <= 0) {
-        // Max attempts reached - delete OTP and throw error
-        console.log(`[OTP SERVICE] Max attempts reached for email: ${email}, deleting OTP`);
-        otpStore.delete(email);
-        throw new Error('Maximum verification attempts exceeded. Please request a new OTP.');
-      } else {
-        // Still have attempts left
-        return {
-          success: false,
-          message: `Invalid OTP. ${remainingAttempts} attempts remaining`
-        };
-      }
-    }
   } catch (error) {
-    console.error('[OTP SERVICE] Error verifying OTP:', error);
-    throw error;
+    console.error('❌ Error sending OTP:', error);
+    
+    // Handle specific Gmail errors
+    if (error.code === 'EAUTH') {
+      return {
+        success: false,
+        message: 'Gmail authentication failed. Please check email credentials.'
+      };
+    } else if (error.code === 'ECONNECTION') {
+      return {
+        success: false,
+        message: 'Failed to connect to Gmail. Please check internet connection.'
+      };
+    } else if (error.responseCode === 550) {
+      return {
+        success: false,
+        message: 'Invalid email address. Please check the email format.'
+      };
+    }
+    
+    return {
+      success: false,
+      message: 'Failed to send OTP. Please try again.'
+    };
   }
 };
 
+// Resend OTP
 const resendOTP = async (email, purpose = 'registration') => {
   try {
-    // Check if there's an existing OTP
-    const existingOtpData = otpStore.get(email);
+    // Check if there's already a valid OTP
+    const key = `${email}:${purpose}`;
+    const existing = otpStore.get(key);
     
-    if (existingOtpData) {
-      // If OTP exists but max attempts exceeded, delete it and send new one
-      if (existingOtpData.attempts >= OTP_CONFIG.MAX_ATTEMPTS) {
-        console.log(`[OTP SERVICE] Max attempts exceeded for ${email}, deleting old OTP and sending new one`);
-        otpStore.delete(email);
-      } else {
-        // If OTP exists and attempts not exceeded, just delete and send new one
-        console.log(`[OTP SERVICE] Resending OTP for ${email}`);
-        otpStore.delete(email);
-      }
-    } else {
-      console.log(`[OTP SERVICE] No existing OTP found for ${email}, sending new OTP`);
+    if (existing && Date.now() < existing.expiresAt) {
+      // If OTP is still valid, don't send a new one
+      const timeLeft = Math.floor((existing.expiresAt - Date.now()) / 1000);
+      return {
+        success: false,
+        message: `Please wait ${timeLeft} seconds before requesting a new OTP.`
+      };
     }
     
     // Send new OTP
     return await sendOTP(email, purpose);
+    
   } catch (error) {
-    console.error('[OTP SERVICE] Error resending OTP:', error);
-    throw error;
+    console.error('❌ Error resending OTP:', error);
+    return {
+      success: false,
+      message: 'Failed to resend OTP. Please try again.'
+    };
   }
 };
 
-const getOTPStatus = (email) => {
-  const otpData = otpStore.get(email);
-  if (!otpData) {
-    return { exists: false };
+// Get OTP status
+const getOTPStatus = (email, purpose = 'registration') => {
+  const key = `${email}:${purpose}`;
+  const stored = otpStore.get(key);
+  
+  if (!stored) {
+    return {
+      exists: false,
+      message: 'No OTP found'
+    };
   }
+  
+  if (Date.now() > stored.expiresAt) {
+    otpStore.delete(key);
+    return {
+      exists: false,
+      message: 'OTP expired'
+    };
+  }
+  
   return {
     exists: true,
-    purpose: otpData.purpose,
-    attempts: otpData.attempts,
-    expiresAt: new Date(otpData.expiresAt).toISOString(),
-    isExpired: Date.now() > otpData.expiresAt,
-    verified: otpData.verified || false
+    verified: stored.verified,
+    attempts: stored.attempts,
+    expiresAt: stored.expiresAt,
+    timeLeft: Math.floor((stored.expiresAt - Date.now()) / 1000)
   };
 };
 
-// Debug function to list all OTPs (for development only)
+// Check if OTP is verified (for password reset)
+const isOTPVerified = (email, purpose = 'registration') => {
+  const key = `${email}:${purpose}`;
+  const stored = otpStore.get(key);
+  
+  if (!stored) {
+    return {
+      verified: false,
+      message: 'No OTP found'
+    };
+  }
+  
+  if (Date.now() > stored.expiresAt) {
+    otpStore.delete(key);
+    return {
+      verified: false,
+      message: 'OTP expired'
+    };
+  }
+  
+  if (!stored.verified) {
+    return {
+      verified: false,
+      message: 'OTP not verified'
+    };
+  }
+  
+  return {
+    verified: true,
+    message: 'OTP verified'
+  };
+};
+
+// Debug function to view OTP store
 const debugOTPStore = () => {
-  const otps = [];
-  for (const [email, data] of otpStore.entries()) {
-    otps.push({
-      email,
-      purpose: data.purpose,
-      attempts: data.attempts,
-      expiresAt: new Date(data.expiresAt).toISOString(),
-      isExpired: Date.now() > data.expiresAt,
-      verified: data.verified || false
+  console.log('🔍 OTP Store Debug:');
+  for (const [key, value] of otpStore.entries()) {
+    console.log(`  ${key}:`, {
+      otp: value.otp,
+      attempts: value.attempts,
+      expiresAt: new Date(value.expiresAt).toISOString(),
+      timeLeft: Math.floor((value.expiresAt - Date.now()) / 1000) + 's'
     });
   }
-  return otps;
 };
+
+// Cleanup expired OTPs (run periodically)
+const cleanupExpiredOTPs = () => {
+  const now = Date.now();
+  for (const [key, value] of otpStore.entries()) {
+    if (now > value.expiresAt) {
+      otpStore.delete(key);
+      console.log(`🧹 Cleaned up expired OTP for: ${key}`);
+    }
+  }
+};
+
+// Run cleanup every 5 minutes
+setInterval(cleanupExpiredOTPs, 5 * 60 * 1000);
+
+// Test Gmail connection on startup
+const testGmailConnection = async () => {
+  try {
+    const transporter = createTransporter();
+    await transporter.verify();
+    console.log('✅ Gmail OTP service initialized successfully');
+    return true;
+  } catch (error) {
+    console.error('❌ Gmail OTP service initialization failed:', error.message);
+    return false;
+  }
+};
+
+// Test connection on module load
+testGmailConnection();
 
 module.exports = {
   sendOTP,
   verifyOTP,
   resendOTP,
   getOTPStatus,
+  isOTPVerified,
   debugOTPStore,
-  OTP_CONFIG,
-  otpStore
-}; 
+  otpStore,
+  cleanupExpiredOTPs,
+  testGmailConnection
+};

@@ -182,11 +182,8 @@ export const AuthProvider = ({ children }) => {
     const checkAuth = async () => {
       try {
         const token = localStorage.getItem('token');
-        console.log('AuthContext: Checking token:', token ? 'Token exists' : 'No token found');
         if (token) {
-          console.log('AuthContext: Making /auth/me request with token');
           const response = await api.get('/auth/me');
-          console.log('AuthContext: /auth/me response:', response.data);
           setUser(response.data.user);
           
           // Also fetch subscription status if user exists
@@ -212,11 +209,6 @@ export const AuthProvider = ({ children }) => {
 
     checkAuth();
   }, []);
-
-  // Monitor user state changes
-  useEffect(() => {
-    console.log('AuthContext: User state changed:', user ? { id: user.id, role: user.role } : null);
-  }, [user]);
 
   const login = async (credentials) => {
     try {

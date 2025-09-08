@@ -2,28 +2,12 @@ const { User } = require('../models');
 const { sequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { sendOTP, verifyOTP, resendOTP, getOTPStatus, debugOTPStore, otpStore } = require('../utils/otpService');
+const { sendOTP, verifyOTP, resendOTP, getOTPStatus, isOTPVerified, debugOTPStore, otpStore } = require('../utils/otpService');
 const { ValidationError, NotFoundError } = require('../middlewares/errorHandler');
 const { Op } = require('sequelize');
 
-// Temporary storage for pending registrations (in production, use Redis or database)
-const pendingRegistrations = new Map();
-
-// Add this function at the top of the file
-const cleanupExpiredRegistrations = () => {
-  const now = Date.now();
-  const tenMinutes = 10 * 60 * 1000;
-  
-  for (const [email, data] of pendingRegistrations.entries()) {
-    if (now - data.timestamp > tenMinutes) {
-      pendingRegistrations.delete(email);
-      console.log(`Cleaned up expired registration for: ${email}`);
-    }
-  }
-};
-
-// Run cleanup every 5 minutes
-setInterval(cleanupExpiredRegistrations, 5 * 60 * 1000);
+// Note: We now store users directly in database with is_verified: false
+// No need for temporary storage since users are created immediately
 
 // Generate JWT token with proper claims
 const generateJWT = (user) => {
@@ -129,31 +113,27 @@ exports.register = async (req, res, next) => {
     const saltRounds = process.env.NODE_ENV === 'production' ? 12 : 10;
     const password_hash = await bcrypt.hash(password, saltRounds);
     
-    // Store registration data temporarily (don't create user yet)
-    const registrationData = {
+    // Create user in database with is_verified: false
+    const user = await User.create({ 
       full_name,
       email: normalizedEmail,
       phone: normalizedPhone,
       password_hash,
       working_type,
-      timestamp: Date.now()
-    };
+      is_verified: false,  // User is not verified yet
+      role: 'member',
+      is_active: true
+    });
     
-    // Remove any existing pending registration for this email (allow re-registration)
-    if (pendingRegistrations.has(normalizedEmail)) {
-      pendingRegistrations.delete(normalizedEmail);
-      console.log('Removed existing pending registration for:', normalizedEmail);
-    }
+    console.log('User created successfully with ID:', user.id, 'is_verified: false');
     
-    pendingRegistrations.set(normalizedEmail, registrationData);
-    
-    // Send OTP to email
+    // Send OTP to email for verification
     const otpResult = await sendOTP(normalizedEmail);
     
-    console.log('OTP sent successfully, registration pending verification');
+    console.log('OTP sent successfully, user needs to verify email');
     
     res.status(200).json({ 
-      message: 'OTP sent to email. Please verify to complete registration.', 
+      message: 'Registration successful! OTP sent to email. Please verify to activate your account.', 
       email: normalizedEmail,
       expiresIn: otpResult.expiresIn
     });
@@ -305,46 +285,40 @@ exports.verifyOtp = async (req, res, next) => {
     const normalizedEmail = email.toLowerCase().trim();
     console.log('OTP verification attempt for email:', normalizedEmail);
     
-    // Check if there's a pending registration
-    const registrationData = pendingRegistrations.get(normalizedEmail);
-    if (!registrationData) {
-      throw new ValidationError('No pending registration found for this email');
+    // Find the user in database (should exist with is_verified: false)
+    const user = await User.findOne({ where: { email: normalizedEmail } });
+    if (!user) {
+      throw new ValidationError('No registration found for this email. Please register first.');
+    }
+    
+    // Check if user is already verified
+    if (user.is_verified) {
+      throw new ValidationError('Email is already verified. You can login directly.');
     }
     
     // Verify OTP with registration purpose
     const verifyResult = await verifyOTP(normalizedEmail, otp, 'registration');
     if (verifyResult.success) {
-      console.log('OTP verified successfully, creating user...');
+      console.log('OTP verified successfully, updating user verification status...');
       
-      // Create user in database
-      const user = await User.create({ 
-        full_name: registrationData.full_name,
-        email: registrationData.email,
-        phone: registrationData.phone,
-        password_hash: registrationData.password_hash,
-        working_type: registrationData.working_type,
-        is_verified: true,
-        role: 'member',
-        is_active: true
-      });
+      // Update user verification status
+      await user.update({ is_verified: true });
       
-      console.log('User created successfully with ID:', user.id);
-      
-      // Remove from pending registrations
-      pendingRegistrations.delete(normalizedEmail);
+      console.log('User verification updated successfully for ID:', user.id);
       
       // Generate JWT token with proper claims
       const token = generateJWT(user);
       
       res.json({ 
-        message: 'User verified and registered successfully',
+        message: 'Email verified successfully! Your account is now active.',
         token: token,
         user: {
           id: user.id,
           full_name: user.full_name,
           email: user.email,
           phone: user.phone,
-          role: user.role
+          role: user.role,
+          is_verified: true
         }
       });
     } else {
@@ -366,20 +340,15 @@ exports.resendOtp = async (req, res, next) => {
     const normalizedEmail = email.toLowerCase().trim();
     console.log('Resend OTP attempt for email:', normalizedEmail);
     
-    // Check if there's a pending registration
-    const registrationData = pendingRegistrations.get(normalizedEmail);
-    if (!registrationData) {
-      throw new ValidationError('No pending registration found for this email');
+    // Find the user in database (should exist with is_verified: false)
+    const user = await User.findOne({ where: { email: normalizedEmail } });
+    if (!user) {
+      throw new ValidationError('No registration found for this email. Please register first.');
     }
     
-    // Check if OTP is not expired (e.g., within 10 minutes)
-    const timeSinceRegistration = Date.now() - registrationData.timestamp;
-    const tenMinutes = 10 * 60 * 1000; // 10 minutes in milliseconds
-    
-    if (timeSinceRegistration > tenMinutes) {
-      // Remove expired registration
-      pendingRegistrations.delete(normalizedEmail);
-      throw new ValidationError('Registration session expired. Please register again.');
+    // Check if user is already verified
+    if (user.is_verified) {
+      throw new ValidationError('Email is already verified. You can login directly.');
     }
     
     // Resend OTP with registration purpose
@@ -709,29 +678,13 @@ exports.resetPassword = async (req, res, next) => {
       });
     }
 
-          // Check if OTP exists and is verified for forgot password
-      const otpData = otpStore.get(normalizedEmail);
-      
-      if (!otpData) {
-        return res.status(400).json({
-          error: 'OTP not found or expired. Please request a new one.'
-        });
-      }
-      
-      // Check if OTP has expired
-      if (Date.now() > otpData.expiresAt) {
-        otpStore.delete(normalizedEmail);
-        return res.status(400).json({
-          error: 'OTP has expired. Please request a new one.'
-        });
-      }
-      
-      // Check if OTP is verified for forgot password
-      if (!otpData.verified || otpData.purpose !== 'forgot_password') {
-        return res.status(400).json({
-          error: 'Invalid OTP. Please verify your OTP first.'
-        });
-      }
+    // Check if OTP is verified for forgot password
+    const verificationCheck = isOTPVerified(normalizedEmail, 'forgot_password');
+    if (!verificationCheck.verified) {
+      return res.status(400).json({
+        error: verificationCheck.message
+      });
+    }
 
     // Validate password strength
     if (newPassword.length < 8) {
@@ -746,19 +699,20 @@ exports.resetPassword = async (req, res, next) => {
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
     
-          // Update user's password
-      await user.update({
-        password_hash: hashedPassword
-      });
-      
-      // Delete the OTP after successful password reset
-      otpStore.delete(normalizedEmail);
-      
-      console.log('✅ Password reset successfully for:', normalizedEmail);
-      
-      res.json({
-        message: 'Password reset successfully. You can now log in with your new password.'
-      });
+    // Update user's password
+    await user.update({
+      password_hash: hashedPassword
+    });
+    
+    // Delete the verified OTP after successful password reset
+    const key = `${normalizedEmail}:forgot_password`;
+    otpStore.delete(key);
+    
+    console.log('✅ Password reset successfully for:', normalizedEmail);
+    
+    res.json({
+      message: 'Password reset successfully. You can now log in with your new password.'
+    });
   } catch (err) {
     console.error('❌ Reset password error:', err);
     next(err);

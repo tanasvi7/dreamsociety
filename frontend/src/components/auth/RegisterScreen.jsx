@@ -3,29 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft, Loader, AlertCircle, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft, Loader, AlertCircle, CheckCircle, Shield } from 'lucide-react';
 import TermsAndConditions from '../common/TermsAndConditions';
-import { apiPost, checkAvailability, clearPendingRegistration } from '../../services/apiService';
+import { apiPost } from '../../services/apiService';
 import WelcomeHeader from '../welcome/WelcomeHeader';
+import api from '../../services/apiService';
 
-// Utility function to clear stuck registration state
-const clearStuckRegistrationState = () => {
-  const currentRegistrationEmail = localStorage.getItem('currentRegistrationEmail');
-  const registrationStartTime = localStorage.getItem('registrationStartTime');
-  
-  if (currentRegistrationEmail && registrationStartTime) {
-    const timeSinceStart = Date.now() - parseInt(registrationStartTime);
-    const maxProcessingTime = 2 * 60 * 1000; // 2 minutes
-    
-    if (timeSinceStart > maxProcessingTime) {
-      console.log('Clearing stuck registration state for:', currentRegistrationEmail);
-      localStorage.removeItem('currentRegistrationEmail');
-      localStorage.removeItem('registrationStartTime');
-      return true;
-    }
-  }
-  return false;
-};
+// Simplified registration - no need for complex state management
 
 const RegisterScreen = () => {
   const [formData, setFormData] = useState({
@@ -35,120 +19,88 @@ const RegisterScreen = () => {
     workingType: '',
     password: '',
     confirmPassword: '',
-    acceptTerms: false
+    acceptTerms: false,
+    captcha: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
-  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
-  const [isCheckingPhone, setIsCheckingPhone] = useState(false);
-  const [availabilityStatus, setAvailabilityStatus] = useState({
-    email: { available: true, checking: false },
-    phone: { available: true, checking: false }
-  });
   const [showTerms, setShowTerms] = useState(false);
-  const [submitAttempts, setSubmitAttempts] = useState(0);
-  const { register, loading, pendingRegistration, testBackendConnection } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
+  const [availabilityChecked, setAvailabilityChecked] = useState(false);
+  const [captchaQuestion, setCaptchaQuestion] = useState('');
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
+  const { register } = useAuth();
   const navigate = useNavigate();
 
-  // State to handle the specific loading animation for OTP sending
-  const [isSendingOtp, setIsSendingOtp] = useState(false);
-
-  // Clear stuck registration state on component mount
-  useEffect(() => {
-    const wasCleared = clearStuckRegistrationState();
-    if (wasCleared) {
-      console.log('Stuck registration state cleared on component mount');
+  // Generate simple math captcha
+  const generateCaptcha = () => {
+    const num1 = Math.floor(Math.random() * 10) + 1;
+    const num2 = Math.floor(Math.random() * 10) + 1;
+    const operation = Math.random() > 0.5 ? '+' : '-';
+    
+    let question, answer;
+    if (operation === '+') {
+      question = `${num1} + ${num2} = ?`;
+      answer = num1 + num2;
+    } else {
+      // Ensure positive result
+      const larger = Math.max(num1, num2);
+      const smaller = Math.min(num1, num2);
+      question = `${larger} - ${smaller} = ?`;
+      answer = larger - smaller;
     }
-  }, []);
+    
+    setCaptchaQuestion(question);
+    setCaptchaAnswer(answer.toString());
+  };
 
-  // Redirect to OTP verification if there's already a pending registration
-  useEffect(() => {
-    if (pendingRegistration) {
-      navigate('/verify-otp');
+  // Check email/phone availability
+  const checkAvailability = async () => {
+    if (!formData.email || !formData.phone) {
+      setErrors({ general: 'Please enter both email and phone number first' });
+      return false;
     }
-  }, [pendingRegistration, navigate]);
 
-  // Debounced email and phone availability check - Simplified
-  useEffect(() => {
-    const checkEmailAvailability = async () => {
-      if (!formData.email || formData.email.length < 3) {
-        setAvailabilityStatus(prev => ({
-          ...prev,
-          email: { available: true, checking: false }
-        }));
-        return;
+    setCheckingAvailability(true);
+    setErrors({});
+
+    try {
+      const response = await api.get('/auth/check-availability', {
+        params: {
+          email: formData.email.toLowerCase().trim(),
+          phone: formData.phone.trim()
+        }
+      });
+
+      if (response.data.available) {
+        setAvailabilityChecked(true);
+        generateCaptcha();
+        return true;
+      } else {
+        const conflicts = response.data.conflicts;
+        let errorMessage = '';
+        
+        if (conflicts.includes('email') && conflicts.includes('phone')) {
+          errorMessage = 'Both email and phone number are already registered. Please use different credentials.';
+        } else if (conflicts.includes('email')) {
+          errorMessage = 'Email address is already registered. Please use a different email.';
+        } else if (conflicts.includes('phone')) {
+          errorMessage = 'Phone number is already registered. Please use a different phone number.';
+        }
+        
+        setErrors({ general: errorMessage });
+        return false;
       }
-
-      setIsCheckingEmail(true);
-      setAvailabilityStatus(prev => ({
-        ...prev,
-        email: { available: true, checking: true }
-      }));
-
-      try {
-        const result = await checkAvailability(formData.email);
-        setAvailabilityStatus(prev => ({
-          ...prev,
-          email: { 
-            available: result.available && !result.conflicts.includes('email'),
-            checking: false 
-          }
-        }));
-      } catch (error) {
-        console.error('Email availability check error:', error);
-        setAvailabilityStatus(prev => ({
-          ...prev,
-          email: { available: true, checking: false }
-        }));
-      } finally {
-        setIsCheckingEmail(false);
-      }
-    };
-
-    const timeoutId = setTimeout(checkEmailAvailability, 500);
-    return () => clearTimeout(timeoutId);
-  }, [formData.email]);
-
-  useEffect(() => {
-    const checkPhoneAvailability = async () => {
-      if (!formData.phone || formData.phone.length < 10) {
-        setAvailabilityStatus(prev => ({
-          ...prev,
-          phone: { available: true, checking: false }
-        }));
-        return;
-      }
-
-      setIsCheckingPhone(true);
-      setAvailabilityStatus(prev => ({
-        ...prev,
-        phone: { available: true, checking: true }
-      }));
-
-      try {
-        const result = await checkAvailability(undefined, formData.phone);
-        setAvailabilityStatus(prev => ({
-          ...prev,
-          phone: { 
-            available: result.available && !result.conflicts.includes('phone'),
-            checking: false 
-          }
-        }));
-      } catch (error) {
-        console.error('Phone availability check error:', error);
-        setAvailabilityStatus(prev => ({
-          ...prev,
-          phone: { available: true, checking: false }
-        }));
-      } finally {
-        setIsCheckingPhone(false);
-      }
-    };
-
-    const timeoutId = setTimeout(checkPhoneAvailability, 500);
-    return () => clearTimeout(timeoutId);
-  }, [formData.phone]);
+    } catch (error) {
+      console.error('Availability check error:', error);
+      setErrors({ general: 'Failed to check availability. Please try again.' });
+      return false;
+    } finally {
+      setCheckingAvailability(false);
+    }
+  };
 
   const validateForm = () => {
     const newErrors = {};
@@ -165,8 +117,6 @@ const RegisterScreen = () => {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Please enter a valid email address';
-    } else if (!availabilityStatus.email.available) {
-      newErrors.email = 'This email is already registered';
     }
 
     // Phone validation
@@ -174,8 +124,6 @@ const RegisterScreen = () => {
       newErrors.phone = 'Phone number is required';
     } else if (!/^\+?[\d\s\-\(\)]{10,}$/.test(formData.phone)) {
       newErrors.phone = 'Please enter a valid phone number';
-    } else if (!availabilityStatus.phone.available) {
-      newErrors.phone = 'This phone number is already registered';
     }
 
     // Working type validation
@@ -204,6 +152,17 @@ const RegisterScreen = () => {
       newErrors.acceptTerms = 'You must accept the terms and conditions';
     }
 
+    // Availability check validation
+    if (!availabilityChecked) {
+      newErrors.general = 'Please check email and phone availability first';
+    }
+
+    // Captcha validation
+    if (!formData.captcha) {
+      newErrors.captcha = 'Please solve the captcha';
+    } else if (formData.captcha !== captchaAnswer) {
+      newErrors.captcha = 'Incorrect answer. Please try again.';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -223,24 +182,24 @@ const RegisterScreen = () => {
         [name]: ''
       }));
     }
+
+    // Reset availability check if email or phone changes
+    if ((name === 'email' || name === 'phone') && availabilityChecked) {
+      setAvailabilityChecked(false);
+      setCaptchaQuestion('');
+      setCaptchaAnswer('');
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Check submit attempts limit
-    if (submitAttempts >= 3) {
-      setErrors({ general: 'Too many failed attempts. Please wait a few minutes before trying again.' });
-      return;
-    }
-    
     if (validateForm()) {
-      setIsSendingOtp(true); // Start the specific OTP sending loading state
+      setLoading(true);
+      setErrors({});
+      
       try {
         console.log('Starting registration process...');
-        
-        // Clear any previous errors
-        setErrors({});
         
         // Prepare payload for backend
         const payload = {
@@ -257,34 +216,27 @@ const RegisterScreen = () => {
         
         // Check if registration was successful
         if (result && result.success) {
-          console.log('Registration successful, navigating to OTP verification...');
+          console.log('Registration successful, redirecting to OTP verification...');
+          
+          // Store email for OTP verification
+          localStorage.setItem('pendingRegistrationEmail', formData.email.toLowerCase().trim());
+          localStorage.setItem('registrationTimestamp', Date.now().toString());
           
           // Show success message briefly before navigation
-          setErrors({ success: 'Registration successful! Redirecting to verification...' });
-          
-          // Preserve any redirect context for after OTP verification
-          const searchContext = localStorage.getItem('searchRedirectContext');
-          const previewContext = localStorage.getItem('previewRedirectContext');
-          
-          if (searchContext) {
-            localStorage.setItem('pendingSearchContext', searchContext);
-          }
-          if (previewContext) {
-            localStorage.setItem('pendingPreviewContext', previewContext);
-          }
+          setErrors({ success: 'Registration successful! Please verify your email to activate your account...' });
           
           // Small delay to show success message
           setTimeout(() => {
-            navigate('/verify-otp');
+            navigate('/verify-otp', { 
+              state: { email: formData.email.toLowerCase().trim() } 
+            });
           }, 1000);
         } else {
           console.log('Registration failed:', result.error);
-          setSubmitAttempts(prev => prev + 1);
           setErrors({ general: result.error || 'Registration failed. Please try again.' });
         }
       } catch (error) {
         console.error('Registration error:', error);
-        setSubmitAttempts(prev => prev + 1);
         
         let errorMessage = 'Registration failed. Please try again.';
         
@@ -314,7 +266,7 @@ const RegisterScreen = () => {
         
         setErrors({ general: errorMessage });
       } finally {
-        setIsSendingOtp(false);
+        setLoading(false);
       }
     }
   };
@@ -373,10 +325,10 @@ const RegisterScreen = () => {
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
-                    disabled={isSendingOtp}
+                    disabled={loading}
                     className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 ${
                       errors.name ? 'border-red-500' : 'border-gray-300'
-                    } ${isSendingOtp ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     placeholder="Enter your full name"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
                   />
@@ -400,23 +352,15 @@ const RegisterScreen = () => {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    disabled={isSendingOtp}
+                    disabled={loading}
                     className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 ${
                       errors.email ? 'border-red-500' : 'border-gray-300'
-                    } ${isSendingOtp ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     placeholder="Enter your email"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
                   />
-                  {isCheckingEmail && (
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                      <Loader className="w-4 h-4 animate-spin text-blue-500" />
-                    </div>
-                  )}
                   {errors.email && (
                     <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-                  )}
-                  {!errors.email && !availabilityStatus.email.available && (
-                    <p className="mt-1 text-sm text-red-600">This email is already registered</p>
                   )}
                 </div>
               </div>
@@ -435,25 +379,45 @@ const RegisterScreen = () => {
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    disabled={isSendingOtp}
+                    disabled={loading}
                     className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 ${
                       errors.phone ? 'border-red-500' : 'border-gray-300'
-                    } ${isSendingOtp ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     placeholder="Enter your phone number"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
                   />
-                  {isCheckingPhone && (
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                      <Loader className="w-4 h-4 animate-spin text-blue-500" />
-                    </div>
-                  )}
                   {errors.phone && (
                     <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
                   )}
-                  {!errors.phone && !availabilityStatus.phone.available && (
-                    <p className="mt-1 text-sm text-red-600">This phone number is already registered</p>
-                  )}
                 </div>
+              </div>
+
+              {/* Availability Check Button */}
+              <div>
+                <button
+                  type="button"
+                  onClick={checkAvailability}
+                  disabled={checkingAvailability || !formData.email || !formData.phone || loading}
+                  className="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-500 text-white rounded-lg font-semibold hover:from-green-700 hover:to-emerald-600 transition-all duration-300 flex items-center justify-center shadow-lg disabled:opacity-75 disabled:cursor-not-allowed"
+                  style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
+                >
+                  {checkingAvailability ? (
+                    <>
+                      <Loader className="w-5 h-5 animate-spin mr-2" />
+                      Checking Availability...
+                    </>
+                  ) : availabilityChecked ? (
+                    <>
+                      <CheckCircle className="w-5 h-5 mr-2" />
+                      Email & Phone Available
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="w-5 h-5 mr-2" />
+                      Check Email & Phone Availability
+                    </>
+                  )}
+                </button>
               </div>
 
               {/* Working Type Field */}
@@ -465,10 +429,10 @@ const RegisterScreen = () => {
                   name="workingType"
                   value={formData.workingType}
                   onChange={handleChange}
-                  disabled={isSendingOtp}
+                  disabled={loading}
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 ${
                     errors.workingType ? 'border-red-500' : 'border-gray-300'
-                  } ${isSendingOtp ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
                 >
                   <option value="">Select your working type</option>
@@ -497,10 +461,10 @@ const RegisterScreen = () => {
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
-                    disabled={isSendingOtp}
+                    disabled={loading}
                     className={`w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 ${
                       errors.password ? 'border-red-500' : 'border-gray-300'
-                    } ${isSendingOtp ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     placeholder="Create a password"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
                   />
@@ -508,7 +472,7 @@ const RegisterScreen = () => {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    disabled={isSendingOtp}
+                    disabled={loading}
                   >
                     {showPassword ? (
                       <EyeOff className="h-5 w-5 text-gray-400" />
@@ -536,10 +500,10 @@ const RegisterScreen = () => {
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    disabled={isSendingOtp}
+                    disabled={loading}
                     className={`w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 ${
                       errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
-                    } ${isSendingOtp ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     placeholder="Confirm your password"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
                   />
@@ -547,7 +511,7 @@ const RegisterScreen = () => {
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    disabled={isSendingOtp}
+                    disabled={loading}
                   >
                     {showConfirmPassword ? (
                       <EyeOff className="h-5 w-5 text-gray-400" />
@@ -568,7 +532,7 @@ const RegisterScreen = () => {
                   name="acceptTerms"
                   checked={formData.acceptTerms}
                   onChange={handleChange}
-                  disabled={isSendingOtp}
+                  disabled={loading}
                   className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
                 <div className="flex-1">
@@ -588,6 +552,39 @@ const RegisterScreen = () => {
                 </div>
               </div>
 
+              {/* Captcha Field */}
+              {captchaQuestion && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
+                    Security Verification
+                  </label>
+                  <div className="flex items-center space-x-3">
+                    <div className="flex-1">
+                      <div className="bg-gray-50 border border-gray-300 rounded-lg px-4 py-3 text-center">
+                        <p className="text-lg font-mono text-gray-800" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
+                          {captchaQuestion}
+                        </p>
+                      </div>
+                    </div>
+                    <input
+                      type="text"
+                      name="captcha"
+                      value={formData.captcha}
+                      onChange={handleChange}
+                      disabled={loading}
+                      className={`w-20 px-3 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-center text-lg font-mono ${
+                        errors.captcha ? 'border-red-500' : 'border-gray-300'
+                      } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      placeholder="?"
+                      style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
+                    />
+                  </div>
+                  {errors.captcha && (
+                    <p className="mt-1 text-sm text-red-600">{errors.captcha}</p>
+                  )}
+                </div>
+              )}
+
 
               {/* Error Display */}
               {errors.general && (
@@ -602,29 +599,24 @@ const RegisterScreen = () => {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={isSendingOtp}
+                disabled={loading || !availabilityChecked || !captchaQuestion}
                 className="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-cyan-600 transition-all duration-300 flex items-center justify-center shadow-lg disabled:opacity-75 disabled:cursor-not-allowed"
                 style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
               >
-                {isSendingOtp ? (
+                {loading ? (
                   <>
                     <Loader className="w-5 h-5 animate-spin mr-2" />
                     Creating Account...
                   </>
+                ) : !availabilityChecked ? (
+                  'Check Availability First'
+                ) : !captchaQuestion ? (
+                  'Complete Security Check'
                 ) : (
                   'Create Account'
                 )}
               </button>
 
-              {/* Submit Attempts Warning */}
-              {submitAttempts >= 2 && (
-                <div className="mt-2 flex items-center space-x-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <AlertCircle className="w-4 h-4 text-yellow-500 flex-shrink-0" />
-                  <p className="text-sm text-yellow-700 font-medium">
-                    {submitAttempts}/3 attempts used. Too many failed attempts will require a cooldown period.
-                  </p>
-                </div>
-              )}
             </form>
 
             {/* Links */}

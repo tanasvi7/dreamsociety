@@ -9,8 +9,13 @@ export function useIsMobile() {
     const checkMobile = () => {
       const width = window.innerWidth;
       const isMobileDevice = width < MOBILE_BREAKPOINT;
-      console.log('useIsMobile - window.innerWidth:', width, 'isMobile:', isMobileDevice);
-      setIsMobile(isMobileDevice);
+      setIsMobile(prevMobile => {
+        // Only update if the value actually changed
+        if (prevMobile !== isMobileDevice) {
+          return isMobileDevice;
+        }
+        return prevMobile;
+      });
       
       // Store in localStorage for persistence across navigation
       localStorage.setItem('isMobile', isMobileDevice.toString());
@@ -73,7 +78,6 @@ export function useIsMobile() {
     const width = window.innerWidth;
     const isMobileDevice = width < MOBILE_BREAKPOINT;
     if (isMobile !== isMobileDevice) {
-      console.log('useIsMobile - State mismatch detected, correcting:', isMobileDevice);
       setIsMobile(isMobileDevice);
     }
   });

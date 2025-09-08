@@ -81,7 +81,6 @@ const corsOptions = {
     // Default allowed origins - Cleaned up
     const allowedOrigins = process.env.NODE_ENV === 'production' 
       ? [
-        '*',
           'http://dreamssociety.in',
           'https://dreamssociety.in',
           'http://localhost:8080'

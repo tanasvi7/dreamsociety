@@ -17,20 +17,30 @@ export const MobileProvider = ({ children }) => {
     const checkMobile = () => {
       const width = window.innerWidth;
       const mobile = width < 768;
-      console.log('MobileContext - window.innerWidth:', width, 'isMobile:', mobile);
-      setIsMobile(mobile);
+      setIsMobile(prevMobile => {
+        // Only update state if the value actually changed
+        if (prevMobile !== mobile) {
+          return mobile;
+        }
+        return prevMobile;
+      });
     };
 
     // Check immediately
     checkMobile();
 
-    // Add event listeners
+    // Debounced resize handler to prevent excessive calls
+    let resizeTimeout;
     const handleResize = () => {
-      checkMobile();
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(checkMobile, 150);
     };
 
+    // Debounced route change handler
+    let routeTimeout;
     const handleRouteChange = () => {
-      setTimeout(checkMobile, 100);
+      clearTimeout(routeTimeout);
+      routeTimeout = setTimeout(checkMobile, 100);
     };
 
     window.addEventListener('resize', handleResize);
@@ -40,17 +50,15 @@ export const MobileProvider = ({ children }) => {
     const originalPushState = history.pushState;
     history.pushState = function(...args) {
       originalPushState.apply(history, args);
-      setTimeout(checkMobile, 100);
+      handleRouteChange();
     };
-
-    // Check periodically to ensure accuracy
-    const intervalId = setInterval(checkMobile, 1000);
 
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('popstate', handleRouteChange);
       history.pushState = originalPushState;
-      clearInterval(intervalId);
+      clearTimeout(resizeTimeout);
+      clearTimeout(routeTimeout);
     };
   }, []);
 

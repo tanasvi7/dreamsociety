@@ -72,8 +72,15 @@ const LoginScreen = () => {
       
       switch (status) {
         case 400:
-          errorMessage = errorData?.error || errorData?.message || 'Invalid email or password. Please check your credentials.';
-          errorType = 'validation';
+          // Check if it's a verification error
+          if (errorData?.error && errorData.error.includes('verify your email')) {
+            errorMessage = errorData.error;
+            errorType = 'verification';
+            showRetry = false; // Don't show retry for verification errors
+          } else {
+            errorMessage = errorData?.error || errorData?.message || 'Invalid email or password. Please check your credentials.';
+            errorType = 'validation';
+          }
           break;
         case 401:
           errorMessage = 'Invalid email or password. Please check your credentials.';
@@ -372,14 +379,41 @@ const LoginScreen = () => {
               )}
 
               {/* Error Display */}
-              <ErrorDisplay
-                error={errors.general}
-                onRetry={() => {
-                  setErrors({});
-                  setIsLoggingIn(false);
-                  setLoginStep('idle');
-                }}
-              />
+              {errors.general && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-start space-x-2">
+                    <div className="flex-shrink-0">
+                      <svg className="w-5 h-5 text-red-500 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-red-700 text-sm">{errors.general}</p>
+                      {errors.general.includes('verify your email') && (
+                        <div className="mt-2 space-y-2">
+                          <p className="text-red-600 text-xs">
+                            Need to verify your email? You can:
+                          </p>
+                          <div className="flex flex-col space-y-1">
+                            <Link 
+                              to="/register" 
+                              className="text-blue-600 hover:text-blue-700 text-xs underline"
+                            >
+                              Register again to receive a new verification email
+                            </Link>
+                            <Link 
+                              to="/forgot-password" 
+                              className="text-blue-600 hover:text-blue-700 text-xs underline"
+                            >
+                              Use forgot password to reset your account
+                            </Link>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Submit Button */}
               <button

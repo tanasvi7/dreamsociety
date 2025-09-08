@@ -39,25 +39,7 @@ const WelcomeHeader = () => {
   const [searchOpen, setSearchOpen] = React.useState(false);
 
   React.useEffect(() => {
-    console.log('WelcomeHeader - isMobile:', isMobile);
-    console.log('WelcomeHeader - window.innerWidth:', window.innerWidth);
-    console.log('WelcomeHeader - current location:', location.pathname);
-  }, [isMobile, location.pathname]);
-
-  React.useEffect(() => {
     setMenuOpen(false);
-  }, [location.pathname]);
-
-  React.useEffect(() => {
-    const checkMobileState = () => {
-      const width = window.innerWidth;
-      const shouldBeMobile = width < 768;
-      console.log('WelcomeHeader - Location changed, re-checking mobile state:', shouldBeMobile);
-    };
-    
-    checkMobileState();
-    const timeoutId = setTimeout(checkMobileState, 100);
-    return () => clearTimeout(timeoutId);
   }, [location.pathname]);
 
   return (
