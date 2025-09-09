@@ -61,6 +61,9 @@ const RETRY_CONFIG = {
   retryableErrors: ['ERR_NETWORK', 'ECONNABORTED']
 };
 
+// Import network utilities
+import { retryWithBackoff, handleNetworkError, clearBrowserCaches } from '../utils/networkUtils';
+
 // Exponential backoff delay
 const getRetryDelay = (attempt: number): number => {
   const delay = RETRY_CONFIG.baseDelay * Math.pow(2, attempt);
@@ -153,16 +156,19 @@ api.interceptors.response.use(
       ? endTime.getTime() - error.config.metadata.startTime.getTime()
       : 'unknown';
       
-    console.error('API Error:', {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      url: error.config?.url,
-      method: error.config?.method,
-      code: error.code,
-      message: error.message,
-      duration: `${duration}ms`
-    });
+    // Only log in development
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('API Error:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url,
+        method: error.config?.method,
+        code: error.code,
+        message: error.message,
+        duration: `${duration}ms`
+      });
+    }
 
     // Enhanced error logging
     if (error.code === 'ERR_NETWORK') {
@@ -191,6 +197,12 @@ api.interceptors.response.use(
       console.error('No response received from server');
     }
 
+    // Clean up connections on network errors
+    if (error.code === 'ERR_NETWORK') {
+      // Force new connection for next request
+      delete error.config.adapter;
+    }
+
     return Promise.reject(error);
   }
 );
@@ -202,6 +214,45 @@ const apiWithRetry = {
   put: (url: string, data?: any, config?: any) => withRetry(() => api.put(url, data, config)),
   delete: (url: string, config?: any) => withRetry(() => api.delete(url, config)),
   patch: (url: string, data?: any, config?: any) => withRetry(() => api.patch(url, data, config))
+};
+
+// Enhanced API methods with network error handling
+export const apiWithNetworkHandling = {
+  get: async (url: string, config?: any) => {
+    try {
+      return await retryWithBackoff(() => api.get(url, config));
+    } catch (error) {
+      throw await handleNetworkError(error, 'GET request');
+    }
+  },
+  post: async (url: string, data?: any, config?: any) => {
+    try {
+      return await retryWithBackoff(() => api.post(url, data, config));
+    } catch (error) {
+      throw await handleNetworkError(error, 'POST request');
+    }
+  },
+  put: async (url: string, data?: any, config?: any) => {
+    try {
+      return await retryWithBackoff(() => api.put(url, data, config));
+    } catch (error) {
+      throw await handleNetworkError(error, 'PUT request');
+    }
+  },
+  delete: async (url: string, config?: any) => {
+    try {
+      return await retryWithBackoff(() => api.delete(url, config));
+    } catch (error) {
+      throw await handleNetworkError(error, 'DELETE request');
+    }
+  },
+  patch: async (url: string, data?: any, config?: any) => {
+    try {
+      return await retryWithBackoff(() => api.patch(url, data, config));
+    } catch (error) {
+      throw await handleNetworkError(error, 'PATCH request');
+    }
+  }
 };
 
 // Check availability function with retry logic

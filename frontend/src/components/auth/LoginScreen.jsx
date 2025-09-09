@@ -6,6 +6,7 @@ import { Eye, EyeOff, Mail, Lock, ArrowLeft, Loader, CheckCircle } from 'lucide-
 import Captcha from '../common/Captcha';
 import WelcomeHeader from '../welcome/WelcomeHeader';
 import ErrorDisplay from '../common/ErrorDisplay';
+import NetworkErrorDisplay from '../common/NetworkErrorDisplay';
 
 const LoginScreen = () => {
   const [formData, setFormData] = useState({
@@ -17,6 +18,7 @@ const LoginScreen = () => {
   const [captchaValid, setCaptchaValid] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginStep, setLoginStep] = useState('idle'); // 'idle', 'authenticating', 'success', 'error'
+  const [isRetrying, setIsRetrying] = useState(false);
   const { login, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -245,7 +247,12 @@ const LoginScreen = () => {
         } else {
           setLoginStep('error');
           console.log('LoginScreen: Login failed with error:', result.error);
-          setErrors({ general: result.error || 'Login failed' });
+          setErrors({ 
+            general: result.error || 'Login failed',
+            type: result.type,
+            retryable: result.retryable,
+            showContactSupport: result.showContactSupport
+          });
           setIsLoggingIn(false);
         }
       } catch (error) {
@@ -263,6 +270,48 @@ const LoginScreen = () => {
         setIsLoggingIn(false);
       }
     };
+
+  const handleRetry = async () => {
+    setIsRetrying(true);
+    setErrors({});
+    
+    try {
+      const result = await login({
+        email: formData.email.toLowerCase().trim(),
+        password: formData.password
+      });
+      
+      if (result && result.success) {
+        // Handle successful login (same logic as handleSubmit)
+        setLoginStep('success');
+        // ... redirect logic would go here
+      } else {
+        setErrors({ 
+          general: result.error || 'Login failed',
+          type: result.type,
+          retryable: result.retryable,
+          showContactSupport: result.showContactSupport
+        });
+      }
+    } catch (error) {
+      const { errorMessage, errorType, showRetry, showContactSupport } = handleLoginError(error);
+      setErrors({ 
+        general: errorMessage,
+        type: errorType,
+        showRetry,
+        showContactSupport
+      });
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  const handleClearCache = async () => {
+    // Clear browser caches and retry
+    const { clearBrowserCaches } = await import('../../utils/networkUtils');
+    clearBrowserCaches();
+    await handleRetry();
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 flex flex-col">
@@ -286,7 +335,7 @@ const LoginScreen = () => {
             {/* Header */}
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
-                Welcome Back
+                Welcome to login
               </h1>
               <p className="text-gray-600" style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}>
                 Sign in to your account to continue
@@ -380,39 +429,53 @@ const LoginScreen = () => {
 
               {/* Error Display */}
               {errors.general && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <div className="flex items-start space-x-2">
-                    <div className="flex-shrink-0">
-                      <svg className="w-5 h-5 text-red-500 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-red-700 text-sm">{errors.general}</p>
-                      {errors.general.includes('verify your email') && (
-                        <div className="mt-2 space-y-2">
-                          <p className="text-red-600 text-xs">
-                            Need to verify your email? You can:
-                          </p>
-                          <div className="flex flex-col space-y-1">
-                            <Link 
-                              to="/register" 
-                              className="text-blue-600 hover:text-blue-700 text-xs underline"
-                            >
-                              Register again to receive a new verification email
-                            </Link>
-                            <Link 
-                              to="/forgot-password" 
-                              className="text-blue-600 hover:text-blue-700 text-xs underline"
-                            >
-                              Use forgot password to reset your account
-                            </Link>
-                          </div>
+                <>
+                  {/* Network errors with retry functionality */}
+                  {(errors.type === 'network_error' || errors.type === 'network_offline' || errors.type === 'backend_unavailable' || errors.type === 'timeout' || errors.type === 'server_error') ? (
+                    <NetworkErrorDisplay
+                      error={errors}
+                      onRetry={handleRetry}
+                      onClearCache={handleClearCache}
+                      isRetrying={isRetrying}
+                      showClearCache={true}
+                    />
+                  ) : (
+                    /* Regular error display for non-network errors */
+                    <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-start space-x-2">
+                        <div className="flex-shrink-0">
+                          <svg className="w-5 h-5 text-red-500 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                          </svg>
                         </div>
-                      )}
+                        <div className="flex-1">
+                          <p className="text-red-700 text-sm">{errors.general}</p>
+                          {errors.general.includes('verify your email') && (
+                            <div className="mt-2 space-y-2">
+                              <p className="text-red-600 text-xs">
+                                Need to verify your email? You can:
+                              </p>
+                              <div className="flex flex-col space-y-1">
+                                <Link 
+                                  to="/register" 
+                                  className="text-blue-600 hover:text-blue-700 text-xs underline"
+                                >
+                                  Register again to receive a new verification email
+                                </Link>
+                                <Link 
+                                  to="/forgot-password" 
+                                  className="text-blue-600 hover:text-blue-700 text-xs underline"
+                                >
+                                  Use forgot password to reset your account
+                                </Link>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  )}
+                </>
               )}
 
               {/* Submit Button */}

@@ -1,7 +1,8 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import api from '../services/apiService';
+import api, { apiWithNetworkHandling } from '../services/apiService';
 import profilePhotoService from '../services/profilePhotoService';
+import { handleNetworkError, retryWithBackoff, checkNetworkConnectivity } from '../utils/networkUtils';
 
 const AuthContext = createContext();
 
@@ -214,10 +215,23 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('AuthContext: Attempting login with credentials:', credentials);
       
-      // Direct API call - no retry for authentication (400 errors should not be retried)
-      const response = await api.post('/auth/login', credentials, {
-        timeout: 60000 // 60 seconds timeout
-      });
+      // Check network connectivity first
+      const isOnline = await checkNetworkConnectivity();
+      if (!isOnline) {
+        return {
+          success: false,
+          error: 'No internet connection detected. Please check your network connection.',
+          type: 'network_offline',
+          retryable: true
+        };
+      }
+      
+      // Use enhanced network handling with retry for login
+      const response = await retryWithBackoff(async () => {
+        return await api.post('/auth/login', credentials, {
+          timeout: 60000 // 60 seconds timeout
+        });
+      }, 3, 1000);
       
       console.log('AuthContext: Login response:', response.data);
       const { token, user: userData } = response.data;
@@ -244,7 +258,7 @@ export const AuthProvider = ({ children }) => {
       
       return { success: true, user: userData };
     } catch (error) {
-      return handleApiError(error, 'Login');
+      return await handleNetworkError(error, 'Login');
     }
   };
 
@@ -543,10 +557,23 @@ export const AuthProvider = ({ children }) => {
         }
       }
       
-      // Direct API call - no retry for OTP verification (400 errors should not be retried)
-      const response = await api.post('/auth/verify-otp', otpData, {
-        timeout: 60000 // 60 seconds timeout
-      });
+      // Check network connectivity first
+      const isOnline = await checkNetworkConnectivity();
+      if (!isOnline) {
+        return {
+          success: false,
+          error: 'No internet connection detected. Please check your network connection.',
+          type: 'network_offline',
+          retryable: true
+        };
+      }
+      
+      // Use enhanced network handling with retry for OTP verification
+      const response = await retryWithBackoff(async () => {
+        return await api.post('/auth/verify-otp', otpData, {
+          timeout: 60000 // 60 seconds timeout
+        });
+      }, 3, 1000);
       
       console.log('AuthContext: OTP verification response:', response.data);
       
@@ -568,7 +595,7 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('OTP verification error:', error);
       
-      // Handle specific OTP errors
+      // Handle specific OTP errors first
       if (error.response?.data?.message) {
         const backendMessage = error.response.data.message;
         
@@ -600,15 +627,7 @@ export const AuthProvider = ({ children }) => {
       }
       
       // Handle network and other errors
-      if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
-        return {
-          success: false,
-          error: 'Network error. Please check your connection and try again.',
-          type: 'network_error'
-        };
-      }
-      
-      return handleApiError(error, 'OTP verification');
+      return await handleNetworkError(error, 'OTP verification');
     }
   };
 
@@ -616,10 +635,23 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('AuthContext: Resending OTP');
       
-      // Direct API call - no retry for OTP resend (400 errors should not be retried)
-      const response = await api.post('/auth/resend-otp', { email }, {
-        timeout: 60000 // 60 seconds timeout
-      });
+      // Check network connectivity first
+      const isOnline = await checkNetworkConnectivity();
+      if (!isOnline) {
+        return {
+          success: false,
+          error: 'No internet connection detected. Please check your network connection.',
+          type: 'network_offline',
+          retryable: true
+        };
+      }
+      
+      // Use enhanced network handling with retry for OTP resend
+      const response = await retryWithBackoff(async () => {
+        return await api.post('/auth/resend-otp', { email }, {
+          timeout: 60000 // 60 seconds timeout
+        });
+      }, 3, 1000);
       
       console.log('AuthContext: Resend OTP response:', response.data);
       
@@ -630,7 +662,7 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Resend OTP error:', error);
       
-      // Handle specific resend errors
+      // Handle specific resend errors first
       if (error.response?.data?.message) {
         const backendMessage = error.response.data.message;
         
@@ -661,16 +693,8 @@ export const AuthProvider = ({ children }) => {
         }
       }
       
-      // Handle network errors
-      if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
-        return {
-          success: false,
-          error: 'Network error. Please check your connection and try again.',
-          type: 'network_error'
-        };
-      }
-      
-      return handleApiError(error, 'Resend OTP');
+      // Handle network and other errors
+      return await handleNetworkError(error, 'Resend OTP');
     }
   };
 
