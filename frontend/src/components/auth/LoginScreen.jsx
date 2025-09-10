@@ -247,8 +247,18 @@ const LoginScreen = () => {
         } else {
           setLoginStep('error');
           console.log('LoginScreen: Login failed with error:', result.error);
+          
+          // Set specific field errors for invalid credentials
+          const newErrors = {};
+          if (result.error && (result.error.includes('Invalid') || result.error.includes('invalid') || result.error.includes('credentials'))) {
+            newErrors.email = 'Invalid email or password';
+            newErrors.password = 'Invalid email or password';
+          } else {
+            newErrors.general = result.error || 'Login failed';
+          }
+          
           setErrors({ 
-            general: result.error || 'Login failed',
+            ...newErrors,
             type: result.type,
             retryable: result.retryable,
             showContactSupport: result.showContactSupport
@@ -261,8 +271,17 @@ const LoginScreen = () => {
         
         const { errorMessage, errorType, showRetry, showContactSupport } = handleLoginError(error);
         
+        // Set specific field errors for authentication failures
+        const newErrors = {};
+        if (errorType === 'authentication' || errorType === 'validation') {
+          newErrors.email = 'Invalid email or password';
+          newErrors.password = 'Invalid email or password';
+        } else {
+          newErrors.general = errorMessage;
+        }
+        
         setErrors({ 
-          general: errorMessage,
+          ...newErrors,
           type: errorType,
           showRetry,
           showContactSupport
@@ -374,10 +393,10 @@ const LoginScreen = () => {
                     placeholder="Enter your email"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
                   />
-                  {errors.email && (
-                    <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-                  )}
                 </div>
+                {errors.email && (
+                  <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+                )}
               </div>
 
               {/* Password Field */}
@@ -413,10 +432,10 @@ const LoginScreen = () => {
                       <Eye className="h-5 w-5 text-gray-400" />
                     )}
                   </button>
-                  {errors.password && (
-                    <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-                  )}
                 </div>
+                {errors.password && (
+                  <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+                )}
               </div>
 
               {/* Captcha Field */}

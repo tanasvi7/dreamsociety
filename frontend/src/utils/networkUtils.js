@@ -121,20 +121,81 @@ export const classifyNetworkError = (error) => {
       retryable: true,
       showContactSupport: false
     };
-  } else if (error.response?.status >= 500) {
-    return {
-      type: 'server_error',
-      message: 'Server error. Please try again later or contact support.',
-      retryable: true,
-      showContactSupport: true
-    };
-  } else if (error.response?.status === 429) {
-    return {
-      type: 'rate_limit',
-      message: 'Too many requests. Please wait a few minutes before trying again.',
-      retryable: true,
-      showContactSupport: false
-    };
+  } else if (error.response) {
+    const status = error.response.status;
+    const errorData = error.response.data;
+    
+    switch (status) {
+      case 400:
+        // Check if it's a verification error
+        if (errorData?.error && errorData.error.includes('verify your email')) {
+          return {
+            type: 'verification',
+            message: errorData.error,
+            retryable: false,
+            showContactSupport: false
+          };
+        } else {
+          // For login, this is typically invalid credentials
+          return {
+            type: 'validation',
+            message: errorData?.error || errorData?.message || 'Invalid email or password. Please check your credentials.',
+            retryable: false,
+            showContactSupport: false
+          };
+        }
+      case 401:
+        return {
+          type: 'authentication',
+          message: 'Invalid email or password. Please check your credentials.',
+          retryable: false,
+          showContactSupport: false
+        };
+      case 403:
+        return {
+          type: 'access_denied',
+          message: 'Access denied. Your account may be suspended.',
+          retryable: false,
+          showContactSupport: true
+        };
+      case 404:
+        return {
+          type: 'service_not_found',
+          message: 'Service not found. Please try again later.',
+          retryable: true,
+          showContactSupport: false
+        };
+      case 429:
+        return {
+          type: 'rate_limit',
+          message: 'Too many requests. Please wait a few minutes before trying again.',
+          retryable: true,
+          showContactSupport: false
+        };
+      case 500:
+        return {
+          type: 'server_error',
+          message: errorData?.error || errorData?.message || 'Server error. Please try again later or contact support.',
+          retryable: true,
+          showContactSupport: true
+        };
+      case 502:
+      case 503:
+      case 504:
+        return {
+          type: 'service_unavailable',
+          message: 'Service temporarily unavailable. Please try again later.',
+          retryable: true,
+          showContactSupport: false
+        };
+      default:
+        return {
+          type: 'unknown',
+          message: errorData?.error || errorData?.message || 'An unexpected error occurred. Please try again.',
+          retryable: true,
+          showContactSupport: false
+        };
+    }
   }
   
   return {

@@ -386,10 +386,10 @@ const RegisterScreen = () => {
                     placeholder="Enter your phone number"
                     style={{fontFamily: 'Quicksand, Montserrat, Inter, Plus Jakarta Sans, sans-serif'}}
                   />
-                  {errors.phone && (
-                    <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
-                  )}
                 </div>
+                {errors.phone && (
+                  <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+                )}
               </div>
 
               {/* Availability Check Button */}
@@ -480,10 +480,10 @@ const RegisterScreen = () => {
                       <Eye className="h-5 w-5 text-gray-400" />
                     )}
                   </button>
-                  {errors.password && (
-                    <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-                  )}
                 </div>
+                {errors.password && (
+                  <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+                )}
               </div>
 
               {/* Confirm Password Field */}
@@ -519,10 +519,10 @@ const RegisterScreen = () => {
                       <Eye className="h-5 w-5 text-gray-400" />
                     )}
                   </button>
-                  {errors.confirmPassword && (
-                    <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
-                  )}
                 </div>
+                {errors.confirmPassword && (
+                  <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
+                )}
               </div>
 
               {/* Terms and Conditions */}
